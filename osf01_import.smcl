@@ -1,0 +1,677 @@
+--------------------------------------------------------------------------------
+      name:  osf01_import
+       log:  /Users/mmking/Documents/SocResearch/SocArXiv_gender/stata/osf01_imp
+> ort.smcl
+  log type:  text
+ opened on:   3 Mar 2025, 11:14:03
+
+. 
+. //      project:        SocArXiv
+. 
+. //  task:       Import
+. 
+. //  github:     SocArXiv_gender
+. //  author:     Molly King 
+. 
+. display "$S_DATE  $S_TIME"
+ 3 Mar 2025  11:14:03
+
+. 
+. ***--------------------------***
+. // PROGRAM SETUP
+. ***--------------------------***
+. 
+. version 18 // keeps program consistent for future replications
+
+. set linesize 80
+
+. clear all
+
+. set more off
+
+. 
+. ***--------------------------***
+. // IMPORT SURVEY DATA
+. ***--------------------------***
+. 
+. import delimited $raw/clean_surveys_with_names.tsv, delimiter(tab) clear
+(encoding automatically selected: ISO-8859-1)
+(65 vars, 19,908 obs)
+
+. do $stata/osf01a_survey_demographics.do
+
+. 
+. ***--------------------------***
+. // GENDER
+. ***--------------------------***
+. 
+. rename gender_man author_gender_man
+
+. label var author_gender_man "Author gender man=1 not=0"
+
+. label define author_gender_man 0 "Not man" 1 "Man"
+
+. label val author_gender_man author_gender_man
+
+. 
+. rename gender_woman author_gender_woman
+
+. label var author_gender_woman "Author woman"
+
+. label define author_gender_woman 0 "Not woman" 1 "Woman"
+
+. lab val author_gender_woman author_gender_woman
+
+. 
+. rename gender_nb author_gender_nb
+
+. label var author_gender_nb "Author nonbinary=1 binary=0"
+
+. label define author_gender_nb 0 "Not nonbinary" 1 "Nonbinary"  
+
+. lab var author_gender_nb author_gender_nb
+
+. 
+. gen author_gender_tnb = .
+(19,908 missing values generated)
+
+.         replace author_gender_tnb = 0 if author_gender_man == 1
+(11,138 real changes made)
+
+.         replace author_gender_tnb = 0 if author_gender_woman == 1
+(7,849 real changes made)
+
+.         replace author_gender_tnb = 1 if author_gender_nb == 1 | trans == 1   
+>   
+(214 real changes made)
+
+. tab author_gender_tnb trans, m
+
+author_gen |              trans
+   der_tnb |         0          1          . |     Total
+-----------+---------------------------------+----------
+         0 |    18,852          0         87 |    18,939 
+         1 |        90        109         15 |       214 
+         . |        64          0        691 |       755 
+-----------+---------------------------------+----------
+     Total |    19,006        109        793 |    19,908 
+
+. tab author_gender_tnb author_gender_nb, m
+
+author_gen |   author_gender_nb
+   der_tnb |         0          1 |     Total
+-----------+----------------------+----------
+         0 |    18,939          0 |    18,939 
+         1 |        56        158 |       214 
+         . |       755          0 |       755 
+-----------+----------------------+----------
+     Total |    19,750        158 |    19,908 
+
+. label var author_gender_tnb "Author trans/nonbinary" 
+
+. label define author_gender_tnb 0 "trans/nonbinary" 1 "cis/binary"
+
+. lab var author_gender_nb author_gender_tnb
+
+. 
+. gen author_gender_wtnb = .
+(19,908 missing values generated)
+
+.         replace author_gender_wtnb = 0 if author_gender_man == 1
+(11,138 real changes made)
+
+.         replace author_gender_wtnb = 1 if author_gender_woman == 1
+(7,849 real changes made)
+
+.         replace author_gender_wtnb = 1 if author_gender_nb == 1 | trans == 1
+(195 real changes made)
+
+. label var author_gender_wtnb "Author woman/trans/nonbinary      = 1" 
+
+. label define author_gender_wtnb 0 "man" 1 "woman/trans/nonbinary"
+
+. label var author_gender_wtnb author_gender_wtnb
+
+. 
+. 
+. count
+  19,908
+
+. 
+. 
+. ***--------------------------***
+. // RACE
+. ***--------------------------***
+. 
+. tab race_puerto_rican
+
+race_puerto |
+     _rican |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,863       99.77       99.77
+          1 |         45        0.23      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. tab race_cuban
+
+ race_cuban |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,888       99.90       99.90
+          1 |         20        0.10      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. tab race_salvadoran
+
+race_salvad |
+       oran |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,899       99.95       99.95
+          1 |          9        0.05      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. tab race_dominican
+
+race_domini |
+        can |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,898       99.95       99.95
+          1 |         10        0.05      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. tab race_guatemalan
+
+race_guatem |
+       alan |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,892       99.92       99.92
+          1 |         16        0.08      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. tab race_columbian
+
+race_columb |
+        ian |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,780       99.36       99.36
+          1 |        128        0.64      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. tab race_filipino
+
+race_filipi |
+         no |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,835       99.63       99.63
+          1 |         73        0.37      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. tab race_korean
+
+race_korean |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,662       98.76       98.76
+          1 |        246        1.24      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. tab race_vietnamese
+
+race_vietna |
+       mese |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,825       99.58       99.58
+          1 |         83        0.42      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. 
+. * racial categories for groups with 500+
+. gen race_other_asian = 0
+
+. replace race_other_asian = 1 if race_asian == 1 & race_chinese == 0 & race_ind
+> ian == 0
+(1,152 real changes made)
+
+. 
+. clonevar race_other_new = race_other
+(332 missing values generated)
+
+.         replace race_other_new = 1 if race_aian == 1
+(41 real changes made)
+
+.         replace race_other_new = 1 if race_nhpi == 1
+(21 real changes made)
+
+.         
+. tab race_black 
+
+ race_black |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,034       97.23       97.23
+          1 |        542        2.77      100.00
+------------+-----------------------------------
+      Total |     19,576      100.00
+
+. label var race_black "Black or African American" 
+
+. 
+. tab race_other_asian 
+
+race_other_ |
+      asian |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     18,756       94.21       94.21
+          1 |      1,152        5.79      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. label var race_other_asian "Other Asian" 
+
+. 
+. tab race_chinese
+
+race_chines |
+          e |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     18,749       94.18       94.18
+          1 |      1,159        5.82      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. lab var race_chinese "Chinese"
+
+. 
+. tab race_indian
+
+race_indian |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,372       97.31       97.31
+          1 |        536        2.69      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. lab var race_indian "Indian"
+
+. 
+. tab race_mena
+
+  race_mena |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     19,055       97.34       97.34
+          1 |        521        2.66      100.00
+------------+-----------------------------------
+      Total |     19,576      100.00
+
+. lab var race_mena "Middle Eastern or North African"
+
+. 
+. tab race_latine
+
+race_latine |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     18,010       92.00       92.00
+          1 |      1,566        8.00      100.00
+------------+-----------------------------------
+      Total |     19,576      100.00
+
+. label var race_latine "Hispanic, Spanish, or Latina/o/x"
+
+. 
+. tab race_other_new
+
+race_other_ |
+        new |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     18,337       93.67       93.67
+          1 |      1,239        6.33      100.00
+------------+-----------------------------------
+      Total |     19,576      100.00
+
+. lab var race_other_new "Other Race / American Indian / Alaska Native or Native
+>  Hawiian / Pacific Islander"
+note: label truncated to 80 characters
+
+. 
+. 
+. 
+. ***--------------------------***
+. // SELF-ID DISCIPLINE
+. ***--------------------------***
+. tab discipline
+
+                             discipline |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+A Discipline Not Listed Here /  Prefe.. |      2,859       15.08       15.08
+                           Anthropology |        223        1.18       16.26
+                         Communications |      1,679        8.86       25.12
+                             Demography |        133        0.70       25.82
+                              Economics |      6,447       34.01       59.83
+                              Geography |        474        2.50       62.33
+                                History |        151        0.80       63.13
+     Human Development / Family Studies |         91        0.48       63.61
+                                    Law |        135        0.71       64.32
+                            Linguistics |        244        1.29       65.60
+                  Management / Business |      1,365        7.20       72.81
+         Political Science / Government |      1,022        5.39       78.20
+                      Prefer Not to Say |         53        0.28       78.48
+                             Psychology |        533        2.81       81.29
+                          Public Policy |        433        2.28       83.57
+                              Sociology |      2,844       15.00       98.58
+                             Statistics |        270        1.42      100.00
+----------------------------------------+-----------------------------------
+                                  Total |     18,956      100.00
+
+. encode discipline, generate(author_discipline_num)
+
+. tab author_discipline_num
+
+                  author_discipline_num |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+A Discipline Not Listed Here /  Prefer  |      2,859       15.08       15.08
+                           Anthropology |        223        1.18       16.26
+                         Communications |      1,679        8.86       25.12
+                             Demography |        133        0.70       25.82
+                              Economics |      6,447       34.01       59.83
+                              Geography |        474        2.50       62.33
+                                History |        151        0.80       63.13
+     Human Development / Family Studies |         91        0.48       63.61
+                                    Law |        135        0.71       64.32
+                            Linguistics |        244        1.29       65.60
+                  Management / Business |      1,365        7.20       72.81
+         Political Science / Government |      1,022        5.39       78.20
+                      Prefer Not to Say |         53        0.28       78.48
+                             Psychology |        533        2.81       81.29
+                          Public Policy |        433        2.28       83.57
+                              Sociology |      2,844       15.00       98.58
+                             Statistics |        270        1.42      100.00
+----------------------------------------+-----------------------------------
+                                  Total |     18,956      100.00
+
+. tab author_discipline_num, nolab m
+
+author_disc |
+ ipline_num |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          1 |      2,859       14.36       14.36
+          2 |        223        1.12       15.48
+          3 |      1,679        8.43       23.92
+          4 |        133        0.67       24.58
+          5 |      6,447       32.38       56.97
+          6 |        474        2.38       59.35
+          7 |        151        0.76       60.11
+          8 |         91        0.46       60.56
+          9 |        135        0.68       61.24
+         10 |        244        1.23       62.47
+         11 |      1,365        6.86       69.32
+         12 |      1,022        5.13       74.46
+         13 |         53        0.27       74.72
+         14 |        533        2.68       77.40
+         15 |        433        2.18       79.58
+         16 |      2,844       14.29       93.86
+         17 |        270        1.36       95.22
+          . |        952        4.78      100.00
+------------+-----------------------------------
+      Total |     19,908      100.00
+
+. lab var author_discipline "Self-ID disc. (econ, or soc)"
+
+. rename author_discipline_num author_discipline
+
+. 
+. gen author_soc = 0
+
+. replace author_soc = . if author_discipline == .
+(952 real changes made, 952 to missing)
+
+. replace author_soc = 1 if author_discipline == 16
+(2,844 real changes made)
+
+. lab var author_soc "Author discipline sociology"
+
+. 
+. tab author_soc author_discipline, m
+
+    Author |
+discipline |              Self-ID disc. (econ, or soc)
+ sociology | A Discipl  Anthropol  Communica  Demograph  Economics |     Total
+-----------+-------------------------------------------------------+----------
+         0 |     2,859        223      1,679        133      6,447 |    16,112 
+         1 |         0          0          0          0          0 |     2,844 
+         . |         0          0          0          0          0 |       952 
+-----------+-------------------------------------------------------+----------
+     Total |     2,859        223      1,679        133      6,447 |    19,908 
+
+
+    Author |
+discipline |              Self-ID disc. (econ, or soc)
+ sociology | Geography    History  Human Dev        Law  Linguisti |     Total
+-----------+-------------------------------------------------------+----------
+         0 |       474        151         91        135        244 |    16,112 
+         1 |         0          0          0          0          0 |     2,844 
+         . |         0          0          0          0          0 |       952 
+-----------+-------------------------------------------------------+----------
+     Total |       474        151         91        135        244 |    19,908 
+
+
+    Author |
+discipline |              Self-ID disc. (econ, or soc)
+ sociology | Managemen  Political  Prefer No  Psycholog  Public Po |     Total
+-----------+-------------------------------------------------------+----------
+         0 |     1,365      1,022         53        533        433 |    16,112 
+         1 |         0          0          0          0          0 |     2,844 
+         . |         0          0          0          0          0 |       952 
+-----------+-------------------------------------------------------+----------
+     Total |     1,365      1,022         53        533        433 |    19,908 
+
+
+    Author |
+discipline |   Self-ID disc. (econ, or soc)
+ sociology | Sociology  Statistic          . |     Total
+-----------+---------------------------------+----------
+         0 |         0        270          0 |    16,112 
+         1 |     2,844          0          0 |     2,844 
+         . |         0          0        952 |       952 
+-----------+---------------------------------+----------
+     Total |     2,844        270        952 |    19,908 
+
+. 
+. gen author_econ = 0
+
+. replace author_econ = . if author_discipline == .
+(952 real changes made, 952 to missing)
+
+. replace author_econ = 1 if author_discipline == 5
+(6,447 real changes made)
+
+. lab var author_econ "Author discipline economics"
+
+. 
+. gen author_comm = 0
+
+. replace author_comm = . if author_discipline == .
+(952 real changes made, 952 to missing)
+
+. replace author_comm = 1 if author_discipline == 3
+(1,679 real changes made)
+
+. lab var author_comm "Author discipline communication"
+
+. 
+. *variable to indicate not soc/econ
+. tab author_discipline, m
+
+           Self-ID disc. (econ, or soc) |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+A Discipline Not Listed Here /  Prefer  |      2,859       14.36       14.36
+                           Anthropology |        223        1.12       15.48
+                         Communications |      1,679        8.43       23.92
+                             Demography |        133        0.67       24.58
+                              Economics |      6,447       32.38       56.97
+                              Geography |        474        2.38       59.35
+                                History |        151        0.76       60.11
+     Human Development / Family Studies |         91        0.46       60.56
+                                    Law |        135        0.68       61.24
+                            Linguistics |        244        1.23       62.47
+                  Management / Business |      1,365        6.86       69.32
+         Political Science / Government |      1,022        5.13       74.46
+                      Prefer Not to Say |         53        0.27       74.72
+                             Psychology |        533        2.68       77.40
+                          Public Policy |        433        2.18       79.58
+                              Sociology |      2,844       14.29       93.86
+                             Statistics |        270        1.36       95.22
+                                      . |        952        4.78      100.00
+----------------------------------------+-----------------------------------
+                                  Total |     19,908      100.00
+
+. gen author_disc_other = 0
+
+. replace author_disc_other = . if author_discipline == .
+(952 real changes made, 952 to missing)
+
+. replace author_disc_other = 1 if author_discipline != 16 & author_discipline !
+> = 5 
+(10,617 real changes made)
+
+. lab var author_disc_other "Binary indicator that author not in econ, soc"
+
+. tab author_discipline author_disc_other, m
+
+                      | Binary indicator that
+                      |  author not in econ,
+ Self-ID disc. (econ, |          soc
+              or soc) |         0          1 |     Total
+----------------------+----------------------+----------
+A Discipline Not List |         0      2,859 |     2,859 
+         Anthropology |         0        223 |       223 
+       Communications |         0      1,679 |     1,679 
+           Demography |         0        133 |       133 
+            Economics |     6,447          0 |     6,447 
+            Geography |         0        474 |       474 
+              History |         0        151 |       151 
+Human Development / F |         0         91 |        91 
+                  Law |         0        135 |       135 
+          Linguistics |         0        244 |       244 
+Management / Business |         0      1,365 |     1,365 
+Political Science / G |         0      1,022 |     1,022 
+    Prefer Not to Say |         0         53 |        53 
+           Psychology |         0        533 |       533 
+        Public Policy |         0        433 |       433 
+            Sociology |     2,844          0 |     2,844 
+           Statistics |         0        270 |       270 
+                    . |         0        952 |       952 
+----------------------+----------------------+----------
+                Total |     9,291     10,617 |    19,908 
+
+. 
+. 
+end of do-file
+
+. isid responseid
+
+. datasignature set
+  19908:74(54369):730982406:3064063601       (data signature set)
+
+. save $clean/survey_clean.dta, replace   
+file ~/Documents/SocResearch/SocArXiv_gender/data/clean_data/survey_clean.dta
+    saved
+
+. count
+  19,908
+
+. 
+. 
+. ***--------------------------***
+. // IMPORT AUTHORS
+. ***--------------------------***
+. 
+. *we have 34k author entries. some in the survey but not osf, others in osf but
+>  not the survey (no responseid). New unique ID for this is 'jm_auth_id' with i
+> ndividual IDs in the format "jmaid_" followed by numbers
+. 
+. import delimited $raw/authors_table.tsv, delimiter(tab) varnames(1) clear
+(encoding automatically selected: ISO-8859-1)
+(3 vars, 33,957 obs)
+
+. datasignature set
+  33957:3(42583):2741391422:4196247600       (data signature set)
+
+. save $raw/authors_table.dta, replace
+file ~/Documents/SocResearch/SocArXiv_gender/data/raw_data/authors_table.dta
+    saved
+
+. isid jm_auth_id
+
+. count
+  33,957
+
+. 
+. 
+. ***--------------------------***
+. // IMPORT PAPERS
+. ***--------------------------***
+. 
+. import delimited $raw/papers_table_with_metadata.tsv, ///
+>         delimiter(tab) varnames(1) clear
+(encoding automatically selected: ISO-8859-1)
+(52 vars, 440,541 obs)
+
+. rename v47 cites_5y
+
+. rename y_cites cites_2y
+
+. rename all_cites cites_all
+
+. datasignature set
+  440541:52(45277):3577333452:2477477705       (data signature set)
+
+. save $raw/papers_table_with_metadata.dta, replace
+file
+    ~/Documents/SocResearch/SocArXiv_gender/data/raw_data/papers_table_with_me
+    > tadata.dta saved
+
+. isid jm_paper_id
+
+. count
+  440,541
+
+. 
+. 
+. ***--------------------------***
+. // IMPORT PAPER-AUTHORS CROSSWALK
+. ***--------------------------***
+. 
+. import delimited $raw/papers_authors_crosswalk.tsv, ///
+>         delimiter(tab) varnames(1) clear
+(encoding automatically selected: ISO-8859-1)
+(2 vars, 492,848 obs)
+
+. datasignature set
+  492848:2(50710):296522008:1845903687       (data signature set)
+
+. save $raw/papers_authors_crosswalk.dta, replace
+file
+    ~/Documents/SocResearch/SocArXiv_gender/data/raw_data/papers_authors_cross
+    > walk.dta saved
+
+. isid jm_paper_id jm_auth_id
+
+. count
+  492,848
+
+. 
+. 
+. ***--------------------------***
+. log close osf01_import
+      name:  osf01_import
+       log:  /Users/mmking/Documents/SocResearch/SocArXiv_gender/stata/osf01_imp
+> ort.smcl
+  log type:  text
+ closed on:   3 Mar 2025, 11:14:11
+--------------------------------------------------------------------------------

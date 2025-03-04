@@ -1,0 +1,3558 @@
+--------------------------------------------------------------------------------
+      name:  osf10
+       log:  /Users/mmking/Documents/SocResearch/SocArXiv_gender/stata/osf10_pap
+> er_outcomes.smcl
+  log type:  text
+ opened on:   3 Mar 2025, 11:14:11
+
+. 
+. //      project:        SocArXiv
+. 
+. //  task:               Feminist Science: Paper Outcomes
+. //                              Merge Survey + WoS + OSF
+. 
+. //  github:     SocArXiv_gender
+. //  author:     Molly King 
+. 
+. display "$S_DATE  $S_TIME"
+ 3 Mar 2025  11:14:11
+
+. 
+. ***--------------------------***
+. // PROGRAM SETUP
+. ***--------------------------***
+. 
+. version 18 // keeps program consistent for future replications
+
+. set linesize 80
+
+. clear all
+
+. set more off
+
+. 
+. ***--------------------------***
+. // MERGE DATA
+. ***--------------------------***
+. 
+. use $raw/authors_table.dta, clear
+
+. drop if responseid == ""
+(14,350 observations deleted)
+
+. 
+. merge 1:1 responseid using $clean/survey_clean.dta
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                           301
+        from master                         0  (_merge==1)
+        from using                        301  (_merge==2)
+
+    Matched                            19,607  (_merge==3)
+    -----------------------------------------
+
+. drop if _merge == 2
+(301 observations deleted)
+
+. drop _merge
+
+. 
+. merge 1:m jm_auth_id using $raw/papers_authors_crosswalk.dta
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                        23,589
+        from master                         0  (_merge==1)
+        from using                     23,589  (_merge==2)
+
+    Matched                           469,259  (_merge==3)
+    -----------------------------------------
+
+. drop if _merge == 2 // authors not in survey
+(23,589 observations deleted)
+
+. drop _merge
+
+. 
+. merge m:1 jm_paper_id using $raw/papers_table_with_metadata.dta
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                         8,466
+        from master                         0  (_merge==1)
+        from using                      8,466  (_merge==2)
+
+    Matched                           469,259  (_merge==3)
+    -----------------------------------------
+
+. drop if _merge == 2 // authors not in survey
+(8,466 observations deleted)
+
+. drop _merge
+
+. 
+. // create group id based on responseid (string)
+. egen responseid_n = group(responseid)
+
+. xtset responseid_n
+
+Panel variable: responseid_n (unbalanced)
+
+. 
+. save $clean/survey_authors_papers.dta, replace
+file
+    ~/Documents/SocResearch/SocArXiv_gender/data/clean_data/survey_authors_pap
+    > ers.dta saved
+
+. 
+. ***--------------------------***
+. // VARIABLE CREATION
+. ***--------------------------***
+. 
+. // AUTHOR posted paper to SocArXiv
+. gen osfpub = .
+(469,259 missing values generated)
+
+.         replace osfpub = 0 if osfid == ""
+(466,774 real changes made)
+
+.         replace osfpub = 1 if osfid != ""
+(2,485 real changes made)
+
+. lab var osfpub "Paper submitted to SocArXiv"
+
+. tab osfpub, m
+
+      Paper |
+  submitted |
+to SocArXiv |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |    466,774       99.47       99.47
+          1 |      2,485        0.53      100.00
+------------+-----------------------------------
+      Total |    469,259      100.00
+
+. 
+. // AUTHOR published paper in WoS
+. gen wospub = .
+(469,259 missing values generated)
+
+.         replace wospub = 0 if uid == ""
+(1,171 real changes made)
+
+.         replace wospub = 1 if uid != ""
+(468,088 real changes made)
+
+. lab var wospub "Paper published in WoS"
+
+. tab wospub, m
+
+      Paper |
+  published |
+     in WoS |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |      1,171        0.25        0.25
+          1 |    468,088       99.75      100.00
+------------+-----------------------------------
+      Total |    469,259      100.00
+
+. 
+. // OSF DATE CREATED VARIABLE
+. split date_created, gen(osfpub_created) parse("-"":"" ")
+variables created as string: 
+osfpub_cre~1  osfpub_cre~2  osfpub_cre~3  osfpub_cre~4  osfpub_cre~5
+
+. rename osfpub_created1 osfpub_created_year 
+
+. rename osfpub_created2 osfpub_created_month
+
+. drop osfpub_created3 osfpub_created4 osfpub_created5
+
+. destring osfpub_created_year, replace
+osfpub_created_year: all characters numeric; replaced as int
+(466812 missing values generated)
+
+. lab var osfpub_created_year "OSF created year"
+
+. lab var osfpub_created_month "OSF created month"
+
+. destring  osfpub_created_month, replace
+osfpub_created_month: all characters numeric; replaced as byte
+(466812 missing values generated)
+
+. 
+. gen osfpub_yearmonth = ym(osfpub_created_year, osfpub_created_month)
+(466,812 missing values generated)
+
+. lab var  osfpub_yearmonth "Stata format OSF year-month"
+
+. 
+. // WoS PUBLICATION DATE VARIABLE
+. split wos_pubdate_clean, gen(wospub) parse("-")
+variables created as string: 
+wospub1  wospub2  wospub3
+
+. rename wospub1 wospub_year
+
+. rename wospub2 wospub_month
+
+. drop wospub3
+
+. destring wospub_year, replace
+wospub_year: all characters numeric; replaced as int
+(1171 missing values generated)
+
+. destring wospub_month, replace
+wospub_month: all characters numeric; replaced as byte
+(1171 missing values generated)
+
+. lab var wospub_year "WoS publciation year"
+
+. lab var wospub_month "WoS publciation month"
+
+. 
+. gen wospub_yearmonth = ym(wospub_year, wospub_month)
+(1,171 missing values generated)
+
+. lab var wospub_yearmonth "Stata format WoS year-month"
+
+. 
+. // TIME from to SocArXiv SUBMISSION to WoS PUBLICATION
+. generate months_wospub_osfpub =  osfpub_yearmonth - wospub_yearmonth
+(467,945 missing values generated)
+
+. lab var months_wospub_osfpub "Months OSF submit - WoS pub (+ osf posted after 
+> pub; - osf preprint before pub)"
+
+. generate years_wospub_osfpub = months_wospub_osfpub / 12
+(467,945 missing values generated)
+
+. lab var years_wospub_osfpub "Years OSF submit - WoS pub (+ osf posted after pu
+> b; - osf preprint before pub)"
+
+. order years_wospub_osfpub months_wospub_osfpub wospub_yearmonth osfpub_yearmon
+> th 
+
+. tab years_wospub_osfpub
+
+  Years OSF |
+   submit - |
+ WoS pub (+ |
+ osf posted |
+ after pub; |
+      - osf |
+   preprint |
+before pub) |      Freq.     Percent        Cum.
+------------+-----------------------------------
+  -5.833333 |          1        0.08        0.08
+       -5.5 |          1        0.08        0.15
+  -4.666667 |          2        0.15        0.30
+       -4.5 |          1        0.08        0.38
+  -4.416667 |          1        0.08        0.46
+  -3.833333 |          6        0.46        0.91
+  -3.666667 |          3        0.23        1.14
+  -3.583333 |          1        0.08        1.22
+  -3.416667 |          7        0.53        1.75
+  -3.333333 |          5        0.38        2.13
+      -3.25 |          5        0.38        2.51
+  -3.166667 |          3        0.23        2.74
+  -3.083333 |          6        0.46        3.20
+         -3 |          3        0.23        3.42
+  -2.916667 |          4        0.30        3.73
+  -2.833333 |          9        0.68        4.41
+      -2.75 |         12        0.91        5.33
+  -2.666667 |          7        0.53        5.86
+  -2.583333 |         10        0.76        6.62
+       -2.5 |          5        0.38        7.00
+  -2.416667 |         10        0.76        7.76
+  -2.333333 |          3        0.23        7.99
+      -2.25 |         11        0.84        8.83
+  -2.166667 |         13        0.99        9.82
+  -2.083333 |         18        1.37       11.19
+         -2 |         26        1.98       13.17
+  -1.916667 |          9        0.68       13.85
+  -1.833333 |          9        0.68       14.54
+      -1.75 |         17        1.29       15.83
+  -1.666667 |         16        1.22       17.05
+  -1.583333 |         19        1.45       18.49
+       -1.5 |         24        1.83       20.32
+  -1.416667 |         27        2.05       22.37
+  -1.333333 |         27        2.05       24.43
+      -1.25 |         41        3.12       27.55
+  -1.166667 |         36        2.74       30.29
+  -1.083333 |         35        2.66       32.95
+         -1 |         25        1.90       34.86
+  -.9166667 |         33        2.51       37.37
+  -.8333333 |         62        4.72       42.09
+       -.75 |         51        3.88       45.97
+  -.6666667 |         61        4.64       50.61
+  -.5833333 |         51        3.88       54.49
+        -.5 |         55        4.19       58.68
+  -.4166667 |         54        4.11       62.79
+  -.3333333 |         51        3.88       66.67
+       -.25 |         59        4.49       71.16
+  -.1666667 |         52        3.96       75.11
+  -.0833333 |         58        4.41       79.53
+          0 |         35        2.66       82.19
+   .0833333 |         20        1.52       83.71
+   .1666667 |         10        0.76       84.47
+        .25 |         14        1.07       85.54
+   .3333333 |         13        0.99       86.53
+   .4166667 |          9        0.68       87.21
+         .5 |          7        0.53       87.75
+   .5833333 |         12        0.91       88.66
+   .6666667 |          9        0.68       89.35
+        .75 |          7        0.53       89.88
+   .8333333 |          4        0.30       90.18
+   .9166667 |          8        0.61       90.79
+          1 |          3        0.23       91.02
+   1.083333 |          5        0.38       91.40
+   1.166667 |          2        0.15       91.55
+       1.25 |          2        0.15       91.70
+   1.333333 |          1        0.08       91.78
+   1.416667 |          5        0.38       92.16
+        1.5 |          2        0.15       92.31
+   1.583333 |          3        0.23       92.54
+   1.666667 |          5        0.38       92.92
+       1.75 |          4        0.30       93.23
+   1.833333 |          6        0.46       93.68
+   1.916667 |          1        0.08       93.76
+          2 |          6        0.46       94.22
+   2.083333 |          5        0.38       94.60
+   2.166667 |          1        0.08       94.67
+   2.333333 |          1        0.08       94.75
+   2.416667 |          2        0.15       94.90
+        2.5 |          3        0.23       95.13
+   2.583333 |          1        0.08       95.21
+   2.666667 |          2        0.15       95.36
+       2.75 |          4        0.30       95.66
+   2.833333 |          2        0.15       95.81
+   2.916667 |          1        0.08       95.89
+          3 |          3        0.23       96.12
+   3.083333 |          4        0.30       96.42
+   3.166667 |          1        0.08       96.50
+       3.25 |          1        0.08       96.58
+   3.583333 |          1        0.08       96.65
+   3.666667 |          1        0.08       96.73
+       3.75 |          1        0.08       96.80
+          4 |          1        0.08       96.88
+   4.083333 |          1        0.08       96.96
+   4.166667 |          2        0.15       97.11
+       4.25 |          2        0.15       97.26
+   4.583333 |          3        0.23       97.49
+   4.666667 |          1        0.08       97.56
+   4.916667 |          2        0.15       97.72
+   5.083333 |          1        0.08       97.79
+   5.166667 |          1        0.08       97.87
+       5.25 |          1        0.08       97.95
+   5.583333 |          1        0.08       98.02
+   5.833333 |          1        0.08       98.10
+   5.916667 |          1        0.08       98.17
+          6 |          1        0.08       98.25
+       6.25 |          1        0.08       98.33
+   6.583333 |          1        0.08       98.40
+       6.75 |          2        0.15       98.55
+   6.833333 |          2        0.15       98.71
+          7 |          3        0.23       98.93
+   7.833333 |          1        0.08       99.01
+   7.916667 |          2        0.15       99.16
+   8.166667 |          1        0.08       99.24
+          9 |          1        0.08       99.32
+         10 |          3        0.23       99.54
+   10.16667 |          1        0.08       99.62
+         11 |          1        0.08       99.70
+       11.5 |          1        0.08       99.77
+   11.58333 |          1        0.08       99.85
+   13.16667 |          1        0.08       99.92
+   14.91667 |          1        0.08      100.00
+------------+-----------------------------------
+      Total |      1,314      100.00
+
+. 
+. // YEARS PHD to PUBLICATION
+. gen years_wospub_phd = .
+(469,259 missing values generated)
+
+.         replace years_wospub_phd = pubyear - phd_year
+(414,865 real changes made)
+
+. lab var years_wospub_phd "Years after PhD published in WoS"
+
+. tab years_wospub_phd
+
+Years after |
+        PhD |
+  published |
+     in WoS |      Freq.     Percent        Cum.
+------------+-----------------------------------
+        -21 |          2        0.00        0.00
+        -20 |         17        0.00        0.00
+        -19 |          7        0.00        0.01
+        -18 |         20        0.00        0.01
+        -17 |         31        0.01        0.02
+        -16 |         45        0.01        0.03
+        -15 |         73        0.02        0.05
+        -14 |         65        0.02        0.06
+        -13 |        110        0.03        0.09
+        -12 |        117        0.03        0.12
+        -11 |        167        0.04        0.16
+        -10 |        240        0.06        0.22
+         -9 |        290        0.07        0.29
+         -8 |        382        0.09        0.38
+         -7 |        580        0.14        0.52
+         -6 |        872        0.21        0.73
+         -5 |      1,255        0.30        1.03
+         -4 |      1,894        0.46        1.49
+         -3 |      2,717        0.65        2.14
+         -2 |      4,264        1.03        3.17
+         -1 |      6,380        1.54        4.71
+          0 |      8,580        2.07        6.78
+          1 |     10,591        2.55        9.33
+          2 |     13,651        3.29       12.62
+          3 |     15,903        3.83       16.45
+          4 |     17,296        4.17       20.62
+          5 |     17,927        4.32       24.94
+          6 |     17,740        4.28       29.22
+          7 |     17,265        4.16       33.38
+          8 |     16,962        4.09       37.47
+          9 |     16,436        3.96       41.43
+         10 |     15,478        3.73       45.16
+         11 |     14,929        3.60       48.76
+         12 |     14,272        3.44       52.20
+         13 |     13,357        3.22       55.42
+         14 |     12,791        3.08       58.50
+         15 |     12,167        2.93       61.44
+         16 |     11,346        2.73       64.17
+         17 |     10,653        2.57       66.74
+         18 |      9,829        2.37       69.11
+         19 |      9,400        2.27       71.37
+         20 |      8,799        2.12       73.49
+         21 |      8,213        1.98       75.47
+         22 |      7,973        1.92       77.40
+         23 |      7,292        1.76       79.15
+         24 |      6,914        1.67       80.82
+         25 |      6,285        1.51       82.33
+         26 |      5,906        1.42       83.76
+         27 |      5,759        1.39       85.15
+         28 |      5,229        1.26       86.41
+         29 |      4,884        1.18       87.58
+         30 |      4,573        1.10       88.69
+         31 |      4,240        1.02       89.71
+         32 |      4,047        0.98       90.68
+         33 |      3,941        0.95       91.63
+         34 |      3,325        0.80       92.44
+         35 |      3,373        0.81       93.25
+         36 |      2,957        0.71       93.96
+         37 |      2,956        0.71       94.67
+         38 |      2,571        0.62       95.29
+         39 |      2,436        0.59       95.88
+         40 |      2,290        0.55       96.43
+         41 |      2,092        0.50       96.94
+         42 |      1,806        0.44       97.37
+         43 |      1,650        0.40       97.77
+         44 |      1,576        0.38       98.15
+         45 |      1,397        0.34       98.49
+         46 |      1,118        0.27       98.76
+         47 |      1,036        0.25       99.01
+         48 |        890        0.21       99.22
+         49 |        665        0.16       99.38
+         50 |        644        0.16       99.54
+         51 |        408        0.10       99.63
+         52 |        378        0.09       99.72
+         53 |        349        0.08       99.81
+         54 |        226        0.05       99.86
+         55 |        125        0.03       99.89
+         56 |        116        0.03       99.92
+         57 |         86        0.02       99.94
+         58 |         79        0.02       99.96
+         59 |         28        0.01       99.97
+         60 |         42        0.01       99.98
+         61 |         16        0.00       99.98
+         62 |         11        0.00       99.98
+         63 |          9        0.00       99.99
+         64 |         17        0.00       99.99
+         65 |          5        0.00       99.99
+         66 |          6        0.00       99.99
+         67 |          3        0.00       99.99
+         68 |          2        0.00       99.99
+         70 |          1        0.00      100.00
+         92 |          3        0.00      100.00
+         93 |          3        0.00      100.00
+         94 |          1        0.00      100.00
+         95 |          3        0.00      100.00
+         96 |          2        0.00      100.00
+         97 |          1        0.00      100.00
+         99 |          2        0.00      100.00
+        100 |          3        0.00      100.00
+        101 |          2        0.00      100.00
+------------+-----------------------------------
+      Total |    414,865      100.00
+
+. hist years_wospub_phd
+(bin=56, start=-21, width=2.1785714)
+
+. 
+. // YEARS PHD to SocArXiv SUBMISSION
+. tab phd_year
+
+   phd_year |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       1920 |         20        0.00        0.00
+       1951 |         28        0.01        0.01
+       1955 |         99        0.02        0.04
+       1956 |         53        0.01        0.05
+       1957 |        111        0.03        0.07
+       1958 |         24        0.01        0.08
+       1959 |         94        0.02        0.10
+       1960 |         21        0.01        0.11
+       1962 |        152        0.04        0.14
+       1963 |        451        0.11        0.25
+       1964 |        392        0.09        0.35
+       1965 |        901        0.22        0.56
+       1966 |        912        0.22        0.78
+       1967 |        699        0.17        0.95
+       1968 |      1,153        0.28        1.23
+       1969 |      1,534        0.37        1.60
+       1970 |      1,835        0.44        2.04
+       1971 |      1,361        0.33        2.37
+       1972 |      2,254        0.54        2.91
+       1973 |      1,868        0.45        3.36
+       1974 |      2,942        0.71        4.06
+       1975 |      3,807        0.92        4.98
+       1976 |      3,527        0.85        5.83
+       1977 |      2,655        0.64        6.47
+       1978 |      4,509        1.08        7.55
+       1979 |      2,603        0.63        8.18
+       1980 |      3,053        0.73        8.91
+       1981 |      3,174        0.76        9.67
+       1982 |      3,412        0.82       10.49
+       1983 |      4,001        0.96       11.46
+       1984 |      4,948        1.19       12.65
+       1985 |      3,870        0.93       13.58
+       1986 |      3,715        0.89       14.47
+       1987 |      4,779        1.15       15.62
+       1988 |      5,174        1.24       16.86
+       1989 |      5,081        1.22       18.09
+       1990 |      8,248        1.98       20.07
+       1991 |      6,014        1.45       21.52
+       1992 |      6,335        1.52       23.04
+       1993 |      7,465        1.80       24.83
+       1994 |      9,010        2.17       27.00
+       1995 |      7,976        1.92       28.92
+       1996 |      8,412        2.02       30.94
+       1997 |     10,518        2.53       33.47
+       1998 |     11,320        2.72       36.19
+       1999 |     10,716        2.58       38.77
+       2000 |     12,348        2.97       41.74
+       2001 |     10,668        2.57       44.30
+       2002 |     10,154        2.44       46.74
+       2003 |     12,646        3.04       49.79
+       2004 |     11,951        2.87       52.66
+       2005 |     13,214        3.18       55.84
+       2006 |     15,067        3.62       59.46
+       2007 |     13,587        3.27       62.73
+       2008 |     14,467        3.48       66.21
+       2009 |     15,366        3.69       69.90
+       2010 |     14,619        3.52       73.42
+       2011 |     14,887        3.58       77.00
+       2012 |     15,774        3.79       80.79
+       2013 |     13,894        3.34       84.13
+       2014 |     11,678        2.81       86.94
+       2015 |     12,517        3.01       89.95
+       2016 |     11,637        2.80       92.75
+       2017 |      9,103        2.19       94.94
+       2018 |      8,011        1.93       96.86
+       2019 |      6,168        1.48       98.34
+       2020 |      4,003        0.96       99.31
+       2021 |      2,881        0.69      100.00
+------------+-----------------------------------
+      Total |    415,866      100.00
+
+. tab pubyear
+
+    pubyear |      Freq.     Percent        Cum.
+------------+-----------------------------------
+       2000 |      3,807        0.81        0.81
+       2001 |      4,102        0.88        1.69
+       2002 |      4,347        0.93        2.62
+       2003 |      5,209        1.11        3.73
+       2004 |      5,585        1.19        4.92
+       2005 |      7,530        1.61        6.53
+       2006 |      9,420        2.01        8.55
+       2007 |     10,948        2.34       10.88
+       2008 |     13,172        2.81       13.70
+       2009 |     15,204        3.25       16.95
+       2010 |     16,089        3.44       20.38
+       2011 |     18,252        3.90       24.28
+       2012 |     19,248        4.11       28.39
+       2013 |     21,165        4.52       32.92
+       2014 |     23,323        4.98       37.90
+       2015 |     25,008        5.34       43.24
+       2016 |     27,598        5.90       49.14
+       2017 |     30,779        6.58       55.71
+       2018 |     32,840        7.02       62.73
+       2019 |     34,177        7.30       70.03
+       2020 |     36,127        7.72       77.75
+       2021 |     35,851        7.66       85.41
+       2022 |     35,708        7.63       93.04
+       2023 |     32,263        6.89       99.93
+       2024 |        336        0.07      100.00
+------------+-----------------------------------
+      Total |    468,088      100.00
+
+. 
+. gen years_osfpub_phd = .
+(469,259 missing values generated)
+
+.         replace years_osfpub_phd = osfpub_created_year - phd_year
+(2,148 real changes made)
+
+.         replace years_osfpub_phd = . if osfpub_created_year == .
+(0 real changes made)
+
+. lab var years_osfpub_phd "Years since PhD to SocArXiv submission"
+
+. tab years_osfpub_phd
+
+Years since |
+     PhD to |
+   SocArXiv |
+ submission |      Freq.     Percent        Cum.
+------------+-----------------------------------
+         -4 |          2        0.09        0.09
+         -3 |         14        0.65        0.74
+         -2 |         35        1.63        2.37
+         -1 |         62        2.89        5.26
+          0 |         61        2.84        8.10
+          1 |        112        5.21       13.31
+          2 |        122        5.68       18.99
+          3 |        113        5.26       24.26
+          4 |        139        6.47       30.73
+          5 |        125        5.82       36.55
+          6 |        144        6.70       43.25
+          7 |        130        6.05       49.30
+          8 |        136        6.33       55.63
+          9 |        120        5.59       61.22
+         10 |        103        4.80       66.01
+         11 |         88        4.10       70.11
+         12 |         64        2.98       73.09
+         13 |         49        2.28       75.37
+         14 |         44        2.05       77.42
+         15 |         55        2.56       79.98
+         16 |         33        1.54       81.52
+         17 |         48        2.23       83.75
+         18 |         28        1.30       85.06
+         19 |         34        1.58       86.64
+         20 |         26        1.21       87.85
+         21 |         25        1.16       89.01
+         22 |         32        1.49       90.50
+         23 |         20        0.93       91.43
+         24 |          9        0.42       91.85
+         25 |          8        0.37       92.23
+         26 |          9        0.42       92.64
+         27 |         12        0.56       93.20
+         28 |         18        0.84       94.04
+         29 |         22        1.02       95.07
+         30 |         12        0.56       95.62
+         31 |          6        0.28       95.90
+         32 |          2        0.09       96.00
+         33 |          4        0.19       96.18
+         34 |          2        0.09       96.28
+         35 |          4        0.19       96.46
+         36 |          4        0.19       96.65
+         37 |         10        0.47       97.11
+         38 |          5        0.23       97.35
+         39 |          6        0.28       97.63
+         40 |          7        0.33       97.95
+         41 |          4        0.19       98.14
+         42 |          6        0.28       98.42
+         43 |          4        0.19       98.60
+         44 |          3        0.14       98.74
+         45 |          2        0.09       98.84
+         46 |          4        0.19       99.02
+         47 |          5        0.23       99.26
+         48 |          6        0.28       99.53
+         49 |          2        0.09       99.63
+         50 |          2        0.09       99.72
+         52 |          1        0.05       99.77
+         53 |          2        0.09       99.86
+         54 |          1        0.05       99.91
+         61 |          1        0.05       99.95
+         63 |          1        0.05      100.00
+------------+-----------------------------------
+      Total |      2,148      100.00
+
+. hist years_osfpub_phd
+(bin=33, start=-4, width=2.030303)
+
+. 
+. 
+. // PAPER PREPRINTed BEFORE WoS PUBLICATION 
+. gen preprint = .
+(469,259 missing values generated)
+
+.         replace preprint = 1 if osfpub_yearmonth < wospub_yearmonth
+(2,178 real changes made)
+
+.         replace preprint = 0 if osfpub_yearmonth >= wospub_yearmonth & osfpub_
+> yearmonth != .
+(269 real changes made)
+
+. lab var preprint "Submitted to SocArXiv before published in WoS"
+
+. 
+. // OPEN PUBLISHING BEHAVIOR
+. tab is_oa, m
+
+      is_OA |      Freq.     Percent        Cum.
+------------+-----------------------------------
+            |    290,258       61.85       61.85
+        Yes |    179,001       38.15      100.00
+------------+-----------------------------------
+      Total |    469,259      100.00
+
+. gen open_pub = .
+(469,259 missing values generated)
+
+.         replace open_pub = 0 if is_oa == ""
+(290,258 real changes made)
+
+.         replace open_pub = 1 if is_oa == "Yes"
+(179,001 real changes made)
+
+.         replace open_pub = 1 if osfid != ""
+(1,244 real changes made)
+
+. tab is_oa, m
+
+      is_OA |      Freq.     Percent        Cum.
+------------+-----------------------------------
+            |    290,258       61.85       61.85
+        Yes |    179,001       38.15      100.00
+------------+-----------------------------------
+      Total |    469,259      100.00
+
+.         
+. // GREEN vs all
+. gen is_green = 0
+
+. replace is_green = 1 if ///
+>         ustrpos(oa_types, "green_submitted") > 0 | ///
+>         ustrpos(oa_types, "green_accepted") > 0 | ///
+>         ustrpos(oa_types, "green_published") > 0
+(139,139 real changes made)
+
+. replace is_green = 1 if osfid != ""
+(1,268 real changes made)
+
+. tab is_green, m
+
+   is_green |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |    328,852       70.08       70.08
+          1 |    140,407       29.92      100.00
+------------+-----------------------------------
+      Total |    469,259      100.00
+
+. 
+. // GREEN OA or OSF
+. gen open_green = .
+(469,259 missing values generated)
+
+. replace open_green = 0 if is_oa == "Yes"
+(179,001 real changes made)
+
+. replace open_green = 1 if ///
+>         ustrpos(oa_types, "green_submitted") > 0 | ///
+>         ustrpos(oa_types, "green_accepted") > 0 | ///
+>         ustrpos(oa_types, "green_published") > 0
+(139,139 real changes made)
+
+. replace open_green = 1 if osfid != ""
+(1,268 real changes made)
+
+. 
+. // AUTHOR EVER PUBLISHED IN FEMINIST JOURNAL
+. tab feminist_journal, m
+
+feminist_jo |
+      urnal |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |    465,500       99.20       99.20
+          1 |      2,588        0.55       99.75
+          . |      1,171        0.25      100.00
+------------+-----------------------------------
+      Total |    469,259      100.00
+
+. lab var feminist_journal "Paper submitted to feminist journal"
+
+. tab feminist_journal osfpub, m
+
+     Paper |
+ submitted |
+        to |  Paper submitted to
+  feminist |       SocArXiv
+   journal |         0          1 |     Total
+-----------+----------------------+----------
+         0 |   464,215      1,285 |   465,500 
+         1 |     2,559         29 |     2,588 
+         . |         0      1,171 |     1,171 
+-----------+----------------------+----------
+     Total |   466,774      2,485 |   469,259 
+
+. 
+. bysort jm_auth_id: egen journal_feminist_ever = max(feminist_journal)
+(8 missing values generated)
+
+.         tab journal_feminist_ever, m
+
+journal_fem |
+ inist_ever |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |    431,838       92.03       92.03
+          1 |     37,413        7.97      100.00
+          . |          8        0.00      100.00
+------------+-----------------------------------
+      Total |    469,259      100.00
+
+.         lab var journal_feminist_ever "Author ever published article in femini
+> st journal"
+
+.         lab define journal_feminist_ever ///
+>                 0 "never pub in feminist journal (author level)" ///
+>                 1 "ever pub in feminist journal (author level)"
+
+.         lab val journal_feminist_ever journal_feminist_ever
+
+. tab journal_feminist_ever, m
+
+       Author ever published article in |
+                       feminist journal |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+never pub in feminist journal (author l |    431,838       92.03       92.03
+ever pub in feminist journal (author le |     37,413        7.97      100.00
+                                      . |          8        0.00      100.00
+----------------------------------------+-----------------------------------
+                                  Total |    469,259      100.00
+
+.         
+. save $clean/survey_authors_papers.dta, replace
+file
+    ~/Documents/SocResearch/SocArXiv_gender/data/clean_data/survey_authors_pap
+    > ers.dta saved
+
+. 
+. ***--------------------------***
+. // Paper submitted to OSF or not
+. ***--------------------------***
+. 
+. // MIXED EFFECTS Model of OSF Publishing 
+. 
+. *Base model
+. melogit osfpub author_gender_woman author_gender_tnb ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -44725.175  
+Iteration 1:  Log likelihood = -15087.113  
+Iteration 2:  Log likelihood = -15062.384  
+Iteration 3:  Log likelihood =  -15062.16  
+Iteration 4:  Log likelihood =  -15062.16  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -12242.542
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -12242.542  
+Iteration 1:  Log likelihood = -10856.233  
+Iteration 2:  Log likelihood = -10534.475  
+Iteration 3:  Log likelihood =  -10420.66  
+Iteration 4:  Log likelihood = -10413.857  
+Iteration 5:  Log likelihood = -10413.254  
+Iteration 6:  Log likelihood = -10413.269  
+Iteration 7:  Log likelihood = -10413.264  
+Iteration 8:  Log likelihood = -10413.265  
+
+Mixed-effects logistic regression               Number of obs     =    450,418
+Group variable: responseid_n                    Number of groups  =     18,861
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       23.9
+                                                              max =      1,100
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(2)      =       7.34
+Log likelihood = -10413.265                     Prob > chi2       =     0.0255
+-------------------------------------------------------------------------------
+       osfpub | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .7854412    .101054    -1.88   0.060     .6103783    1.010714
+author_g~_tnb |   2.575793   1.362286     1.79   0.074     .9135392    7.262641
+        _cons |   .0001205   .0000166   -65.46   0.000     .0000919    .0001578
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   9.590726   .4060106                      8.827079    10.42044
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 9297.79     Prob >= chibar2 = 0.0000
+
+. estimates store model1
+
+. 
+. * add paper-level controls
+. melogit osfpub author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -37979.086  
+Iteration 1:  Log likelihood = -8026.7911  
+Iteration 2:  Log likelihood = -7359.7134  
+Iteration 3:  Log likelihood = -7284.1515  
+Iteration 4:  Log likelihood = -7283.3966  
+Iteration 5:  Log likelihood = -7283.3963  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood =    -6291.1
+
+Fitting full model:
+
+Iteration 0:  Log likelihood =    -6291.1  
+Iteration 1:  Log likelihood = -5630.4926  
+Iteration 2:  Log likelihood = -5488.7068  
+Iteration 3:  Log likelihood = -5445.9882  
+Iteration 4:  Log likelihood = -5443.8921  
+Iteration 5:  Log likelihood = -5443.8506  
+Iteration 6:  Log likelihood =  -5443.846  
+Iteration 7:  Log likelihood = -5443.8455  
+
+Mixed-effects logistic regression               Number of obs     =    412,027
+Group variable: responseid_n                    Number of groups  =     16,454
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       25.0
+                                                              max =      1,099
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(4)      =     605.76
+Log likelihood = -5443.8455                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+       osfpub | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .5448808   .0772102    -4.28   0.000     .4127483    .7193125
+author_g~_tnb |   .9241885   .5795227    -0.13   0.900     .2703991    3.158755
+      pubyear |   1.374063   .0178726    24.43   0.000     1.339476    1.409543
+years_wospu~d |   .9404355   .0061836    -9.34   0.000     .9283937    .9526336
+        _cons |   4.7e-283   1.2e-281   -24.76   0.000     2.1e-305    1.1e-260
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   8.339442   .4873338                      7.436955    9.351448
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 3679.10     Prob >= chibar2 = 0.0000
+
+. estimates store model2
+
+. 
+. * add author-level controls
+. melogit osfpub author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -37581.259  
+Iteration 1:  Log likelihood = -7905.7268  
+Iteration 2:  Log likelihood = -7183.0037  
+Iteration 3:  Log likelihood = -7068.9665  
+Iteration 4:  Log likelihood = -7067.4012  
+Iteration 5:  Log likelihood = -7067.4001  
+Iteration 6:  Log likelihood = -7067.4001  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -6134.8045
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -6134.8045  
+Iteration 1:  Log likelihood = -5515.6793  
+Iteration 2:  Log likelihood = -5384.9686  
+Iteration 3:  Log likelihood = -5345.7644  
+Iteration 4:  Log likelihood = -5344.0935  
+Iteration 5:  Log likelihood =  -5344.081  
+Iteration 6:  Log likelihood = -5344.0794  
+Iteration 7:  Log likelihood = -5344.0791  
+
+Mixed-effects logistic regression               Number of obs     =    407,830
+Group variable: responseid_n                    Number of groups  =     16,286
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       25.0
+                                                              max =      1,099
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(11)     =     645.49
+Log likelihood = -5344.0791                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+       osfpub | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .5179356   .0743857    -4.58   0.000     .3908648    .6863174
+author_g~_tnb |   .8097616   .5117589    -0.33   0.738     .2346436    2.794509
+      pubyear |   1.386301   .0182921    24.76   0.000     1.350909    1.422621
+years_wospu~d |   .9322469   .0063353   -10.32   0.000     .9199123     .944747
+   race_black |   .1871643   .0965057    -3.25   0.001     .0681281    .5141853
+race_other_~n |   .2088628   .0750596    -4.36   0.000     .1032672    .4224348
+ race_chinese |   .1255806   .0488275    -5.34   0.000     .0586089      .26908
+  race_indian |   .2579122   .1248546    -2.80   0.005     .0998637    .6660949
+    race_mena |   .2709902   .1343144    -2.63   0.008     .1025797     .715889
+  race_latine |   .5235357   .1345805    -2.52   0.012     .3163267    .8664766
+race_other_~w |   .4663842   .1440533    -2.47   0.014     .2545839    .8543911
+        _cons |   1.3e-290   3.6e-289   -25.06   0.000            0    6.3e-268
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   8.129951   .4870446                      7.229273    9.142842
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 3446.64     Prob >= chibar2 = 0.0000
+
+. estimates store model3
+
+. 
+. * add paper published in feminist journal 
+. melogit osfpub author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         feminist_journal ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood =  -37580.41  
+Iteration 1:  Log likelihood = -7897.9312  
+Iteration 2:  Log likelihood =  -7219.619  
+Iteration 3:  Log likelihood = -7049.3029  
+Iteration 4:  Log likelihood = -7046.9175  
+Iteration 5:  Log likelihood = -7046.9093  
+Iteration 6:  Log likelihood = -7046.9093  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -6125.4437
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -6125.4437  
+Iteration 1:  Log likelihood = -5507.2366  
+Iteration 2:  Log likelihood =  -5378.073  
+Iteration 3:  Log likelihood = -5339.5343  
+Iteration 4:  Log likelihood = -5337.9348  
+Iteration 5:  Log likelihood = -5337.9243  
+Iteration 6:  Log likelihood = -5337.9228  
+Iteration 7:  Log likelihood = -5337.9226  
+
+Mixed-effects logistic regression               Number of obs     =    407,830
+Group variable: responseid_n                    Number of groups  =     16,286
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       25.0
+                                                              max =      1,099
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(12)     =     655.37
+Log likelihood = -5337.9226                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+       osfpub | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .5093407   .0731283    -4.70   0.000     .3844127    .6748684
+author_g~_tnb |   .7594147   .4809375    -0.43   0.664      .219489    2.627514
+      pubyear |   1.386697   .0183141    24.75   0.000     1.351263    1.423061
+years_wospu~d |   .9324242   .0063282   -10.31   0.000     .9201033    .9449102
+   race_black |   .1866182   .0962349    -3.26   0.001     .0679216    .5127434
+race_other_~n |   .2102887   .0754859    -4.34   0.000     .1040557    .4249775
+ race_chinese |   .1261228   .0490426    -5.32   0.000      .058858    .2702597
+  race_indian |   .2562354   .1241142    -2.81   0.005     .0991602     .662126
+    race_mena |   .2696607   .1336961    -2.64   0.008     .1020464    .7125871
+  race_latine |   .5256341   .1349466    -2.51   0.012     .3177998    .8693875
+race_other_~w |   .4680075   .1443327    -2.46   0.014     .2557077    .8565681
+feminist_jo~l |   2.856117   .8119534     3.69   0.000     1.636031    4.986094
+        _cons |   7.5e-291   2.0e-289   -25.06   0.000            0    3.7e-268
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   8.104308   .4861067                      7.205428    9.115324
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 3417.97     Prob >= chibar2 = 0.0000
+
+. estimates store model4
+
+. 
+. // Paper submitted to OSF or not - interaction with career stage and gender
+. * add other paper-level controls
+. melogit osfpub author_gender_woman##c.years_wospub_phd author_gender_tnb ///
+>         $paper_level_controls ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood =  -37979.01  
+Iteration 1:  Log likelihood = -8026.0976  
+Iteration 2:  Log likelihood = -7361.9989  
+Iteration 3:  Log likelihood = -7282.9648  
+Iteration 4:  Log likelihood = -7282.1694  
+Iteration 5:  Log likelihood = -7282.1691  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -6290.1933
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -6290.1933  
+Iteration 1:  Log likelihood = -5630.2529  
+Iteration 2:  Log likelihood =  -5488.608  
+Iteration 3:  Log likelihood = -5445.8677  
+Iteration 4:  Log likelihood = -5443.7819  
+Iteration 5:  Log likelihood = -5443.7408  
+Iteration 6:  Log likelihood = -5443.7362  
+Iteration 7:  Log likelihood = -5443.7357  
+
+Mixed-effects logistic regression               Number of obs     =    412,027
+Group variable: responseid_n                    Number of groups  =     16,454
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       25.0
+                                                              max =      1,099
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(5)      =     605.66
+Log likelihood = -5443.7357                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+       osfpub | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |
+       Woman  |    .501527   .1045096    -3.31   0.001      .333364    .7545188
+years_wospu~d |   .9386454   .0069614    -8.54   0.000        .9251    .9523891
+              |
+author_g~oman#|
+           c. |
+years_wospu~d |
+       Woman  |   1.007576   .0135519     0.56   0.575     .9813613     1.03449
+              |
+author_g~_tnb |   .9163413     .57484    -0.14   0.889     .2679667    3.133529
+      pubyear |   1.373889   .0178722    24.42   0.000     1.339303    1.409368
+        _cons |   6.3e-283   1.6e-281   -24.74   0.000     2.8e-305    1.4e-260
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   8.339195   .4874855                      7.436444    9.351536
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 3676.87     Prob >= chibar2 = 0.0000
+
+. estimates store model2_int
+
+. 
+. * add author-level controls
+. melogit osfpub author_gender_woman##c.years_wospub_phd author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -37581.185  
+Iteration 1:  Log likelihood =  -7905.047  
+Iteration 2:  Log likelihood = -7185.6515  
+Iteration 3:  Log likelihood = -7067.5381  
+Iteration 4:  Log likelihood =   -7065.96  
+Iteration 5:  Log likelihood = -7065.9588  
+Iteration 6:  Log likelihood = -7065.9588  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -6134.0231
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -6134.0231  
+Iteration 1:  Log likelihood = -5515.3468  
+Iteration 2:  Log likelihood = -5384.8358  
+Iteration 3:  Log likelihood = -5345.6616  
+Iteration 4:  Log likelihood = -5344.0022  
+Iteration 5:  Log likelihood = -5343.9897  
+Iteration 6:  Log likelihood = -5343.9881  
+Iteration 7:  Log likelihood = -5343.9879  
+
+Mixed-effects logistic regression               Number of obs     =    407,830
+Group variable: responseid_n                    Number of groups  =     16,286
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       25.0
+                                                              max =      1,099
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(12)     =     645.49
+Log likelihood = -5343.9879                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+       osfpub | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |
+       Woman  |   .4800822    .101192    -3.48   0.000     .3176134    .7256585
+years_wospu~d |   .9306248   .0070916    -9.44   0.000     .9168289    .9446284
+              |
+author_g~oman#|
+           c. |
+years_wospu~d |
+       Woman  |   1.006945   .0137096     0.51   0.611     .9804298    1.034177
+              |
+author_g~_tnb |   .8031201   .5077884    -0.35   0.729     .2325904    2.773124
+      pubyear |   1.386113   .0182913    24.74   0.000     1.350722    1.422431
+   race_black |   .1872365   .0965976    -3.25   0.001     .0681154    .5146784
+race_other_~n |   .2085726   .0749832    -4.36   0.000     .1030967    .4219584
+ race_chinese |   .1256689   .0488856    -5.33   0.000     .0586284    .2693693
+  race_indian |   .2581068   .1249631    -2.80   0.005     .0999282    .6666703
+    race_mena |   .2701228   .1339739    -2.64   0.008      .102185    .7140608
+  race_latine |   .5225027   .1343348    -2.52   0.012      .315679    .8648313
+race_other_~w |   .4655853   .1438488    -2.47   0.013     .2541026    .8530792
+        _cons |   1.8e-290   4.8e-289   -25.05   0.000            0    8.5e-268
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   8.129495     .48716                      7.228618    9.142644
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 3443.94     Prob >= chibar2 = 0.0000
+
+. estimates store model3_int
+
+. 
+. * put models in a table
+. etable, estimates(model1 model2 model3 model4 model2_int model3_int) ///
+>         mstat(N) mstat(r2_a) column(index) ///
+>         showstars showstarsnote stars(.05 "*" .01 "**" .001 "***", attach(_r_b
+> )) ///
+>         title("Mixed Effects Logistic Regression predicting SocArXiv submissio
+> n" "(ORs)") ///
+>         export($results/osf10_osfpublish_melogit.docx, as(docx) replace)
+
+Mixed Effects Logistic Regression predicting SocArXiv submission (ORs)
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                      1           2           3           4           5           6     
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+Author woman                                                                       0.785       0.545 ***   0.518 ***   0.509 ***                        
+                                                                                 (0.101)     (0.077)     (0.074)     (0.073)                            
+Author trans/nonbinary                                                             2.576       0.924       0.810       0.759       0.916       0.803    
+                                                                                 (1.362)     (0.580)     (0.512)     (0.481)     (0.575)     (0.508)    
+pubyear                                                                                        1.374 ***   1.386 ***   1.387 ***   1.374 ***   1.386 ***
+                                                                                             (0.018)     (0.018)     (0.018)     (0.018)     (0.018)    
+Years after PhD published in WoS                                                               0.940 ***   0.932 ***   0.932 ***   0.939 ***   0.931 ***
+                                                                                             (0.006)     (0.006)     (0.006)     (0.007)     (0.007)    
+Black or African American                                                                                  0.187 **    0.187 **                0.187 ** 
+                                                                                                         (0.097)     (0.096)                 (0.097)    
+Other Asian                                                                                                0.209 ***   0.210 ***               0.209 ***
+                                                                                                         (0.075)     (0.075)                 (0.075)    
+Chinese                                                                                                    0.126 ***   0.126 ***               0.126 ***
+                                                                                                         (0.049)     (0.049)                 (0.049)    
+Indian                                                                                                     0.258 **    0.256 **                0.258 ** 
+                                                                                                         (0.125)     (0.124)                 (0.125)    
+Middle Eastern or North African                                                                            0.271 **    0.270 **                0.270 ** 
+                                                                                                         (0.134)     (0.134)                 (0.134)    
+Hispanic, Spanish, or Latina/o/x                                                                           0.524 *     0.526 *                 0.523 *  
+                                                                                                         (0.135)     (0.135)                 (0.134)    
+Other Race / American Indian / Alaska Native or Native Hawiian / Pacific Islande                           0.466 *     0.468 *                 0.466 *  
+                                                                                                         (0.144)     (0.144)                 (0.144)    
+Paper submitted to feminist journal                                                                                    2.856 ***                        
+                                                                                                                     (0.812)                            
+Author woman                                                                                                                                            
+  Woman                                                                                                                            0.502 ***   0.480 ***
+                                                                                                                                 (0.105)     (0.101)    
+Author woman # Years after PhD published in WoS                                                                                                         
+  Woman                                                                                                                            1.008       1.007    
+                                                                                                                                 (0.014)     (0.014)    
+Intercept                                                                          0.000 ***   0.000 ***   0.000 ***   0.000 ***   0.000 ***   0.000 ***
+                                                                                 (0.000)     (0.000)     (0.000)     (0.000)     (0.000)     (0.000)    
+var(_cons[responseid_n])                                                           9.591       8.339       8.130       8.104       8.339       8.129    
+                                                                                 (0.406)     (0.487)     (0.487)     (0.486)     (0.487)     (0.487)    
+Number of observations                                                            450418      412027      407830      407830      412027      407830    
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+*** p<.001, ** p<.01, * p<.05
+(collection ETable exported to file
+ ~/Documents/SocResearch/SocArXiv_gender/results/osf10_osfpublish_melogit.docx
+ > )
+
+. 
+. 
+. * Hypothesis: "papers by junior men are more likely to be posted on SocArXiv."
+. margins author_gender_woman, at(years_wospub_phd=(-10(1)50)) atmeans
+
+Adjusted predictions                                   Number of obs = 407,830
+Model VCE: OIM
+
+Expression: Marginal predicted mean, predict()
+1._at:  years_wospub_phd =      -10
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+2._at:  years_wospub_phd =       -9
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+3._at:  years_wospub_phd =       -8
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+4._at:  years_wospub_phd =       -7
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+5._at:  years_wospub_phd =       -6
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+6._at:  years_wospub_phd =       -5
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+7._at:  years_wospub_phd =       -4
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+8._at:  years_wospub_phd =       -3
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+9._at:  years_wospub_phd =       -2
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+10._at: years_wospub_phd =       -1
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+11._at: years_wospub_phd =        0
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+12._at: years_wospub_phd =        1
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+13._at: years_wospub_phd =        2
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+14._at: years_wospub_phd =        3
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+15._at: years_wospub_phd =        4
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+16._at: years_wospub_phd =        5
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+17._at: years_wospub_phd =        6
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+18._at: years_wospub_phd =        7
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+19._at: years_wospub_phd =        8
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+20._at: years_wospub_phd =        9
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+21._at: years_wospub_phd =       10
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+22._at: years_wospub_phd =       11
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+23._at: years_wospub_phd =       12
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+24._at: years_wospub_phd =       13
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+25._at: years_wospub_phd =       14
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+26._at: years_wospub_phd =       15
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+27._at: years_wospub_phd =       16
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+28._at: years_wospub_phd =       17
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+29._at: years_wospub_phd =       18
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+30._at: years_wospub_phd =       19
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+31._at: years_wospub_phd =       20
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+32._at: years_wospub_phd =       21
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+33._at: years_wospub_phd =       22
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+34._at: years_wospub_phd =       23
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+35._at: years_wospub_phd =       24
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+36._at: years_wospub_phd =       25
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+37._at: years_wospub_phd =       26
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+38._at: years_wospub_phd =       27
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+39._at: years_wospub_phd =       28
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+40._at: years_wospub_phd =       29
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+41._at: years_wospub_phd =       30
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+42._at: years_wospub_phd =       31
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+43._at: years_wospub_phd =       32
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+44._at: years_wospub_phd =       33
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+45._at: years_wospub_phd =       34
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+46._at: years_wospub_phd =       35
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+47._at: years_wospub_phd =       36
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+48._at: years_wospub_phd =       37
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+49._at: years_wospub_phd =       38
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+50._at: years_wospub_phd =       39
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+51._at: years_wospub_phd =       40
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+52._at: years_wospub_phd =       41
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+53._at: years_wospub_phd =       42
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+54._at: years_wospub_phd =       43
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+55._at: years_wospub_phd =       44
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+56._at: years_wospub_phd =       45
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+57._at: years_wospub_phd =       46
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+58._at: years_wospub_phd =       47
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+59._at: years_wospub_phd =       48
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+60._at: years_wospub_phd =       49
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+61._at: years_wospub_phd =       50
+        author_gend~_tnb = .0078121 (mean)
+        pubyear          = 2015.472 (mean)
+        race_black       = .0196062 (mean)
+        race_other_asian = .0429811 (mean)
+        race_chinese     = .0464213 (mean)
+        race_indian      = .0234755 (mean)
+        race_mena        =  .020381 (mean)
+        race_latine      = .0648211 (mean)
+        race_other_new   = .0611137 (mean)
+
+-------------------------------------------------------------------------------
+              |            Delta-method
+              |     Margin   std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+          _at#|
+author_g~oman |
+ 1#Not woman  |   .0053285   .0008224     6.48   0.000     .0037166    .0069403
+     1#Woman  |   .0027103   .0006154     4.40   0.000     .0015042    .0039165
+ 2#Not woman  |   .0050176   .0007503     6.69   0.000      .003547    .0064881
+     2#Woman  |   .0025658   .0005593     4.59   0.000     .0014695     .003662
+ 3#Not woman  |   .0047241   .0006838     6.91   0.000      .003384    .0060642
+     3#Woman  |   .0024289   .0005078     4.78   0.000     .0014337    .0034242
+ 4#Not woman  |   .0044473   .0006224     7.15   0.000     .0032274    .0056673
+     4#Woman  |   .0022994   .0004605     4.99   0.000     .0013969    .0032019
+ 5#Not woman  |   .0041863   .0005661     7.40   0.000     .0030768    .0052958
+     5#Woman  |   .0021768   .0004171     5.22   0.000     .0013592    .0029944
+ 6#Not woman  |   .0039403   .0005145     7.66   0.000      .002932    .0049487
+     6#Woman  |   .0020608   .0003775     5.46   0.000     .0013209    .0028007
+ 7#Not woman  |   .0037086   .0004672     7.94   0.000     .0027928    .0046244
+     7#Woman  |    .001951   .0003414     5.72   0.000     .0012819      .00262
+ 8#Not woman  |   .0034904   .0004242     8.23   0.000      .002659    .0043218
+     8#Woman  |    .001847   .0003084     5.99   0.000     .0012425    .0024515
+ 9#Not woman  |   .0032849   .0003851     8.53   0.000     .0025302    .0040396
+     9#Woman  |   .0017485   .0002786     6.28   0.000     .0012026    .0022945
+10#Not woman  |   .0030915   .0003496     8.84   0.000     .0024063    .0037767
+    10#Woman  |   .0016553   .0002515     6.58   0.000     .0011623    .0021483
+11#Not woman  |   .0029095   .0003176     9.16   0.000     .0022871    .0035319
+    11#Woman  |    .001567   .0002272     6.90   0.000     .0011218    .0020123
+12#Not woman  |   .0027382   .0002887     9.48   0.000     .0021723    .0033041
+    12#Woman  |   .0014834   .0002053     7.22   0.000     .0010809    .0018858
+13#Not woman  |    .002577   .0002629     9.80   0.000     .0020618    .0030923
+    13#Woman  |   .0014042   .0001858     7.56   0.000     .0010399    .0017684
+14#Not woman  |   .0024254   .0002398    10.12   0.000     .0019554    .0028953
+    14#Woman  |   .0013291   .0001686     7.88   0.000     .0009987    .0016595
+15#Not woman  |   .0022827   .0002193    10.41   0.000      .001853    .0027124
+    15#Woman  |   .0012579   .0001534     8.20   0.000     .0009572    .0015586
+16#Not woman  |   .0021484   .0002011    10.68   0.000     .0017543    .0025426
+    16#Woman  |   .0011905   .0001402     8.49   0.000     .0009157    .0014653
+17#Not woman  |   .0020221   .0001851    10.92   0.000     .0016593    .0023849
+    17#Woman  |   .0011265   .0001289     8.74   0.000      .000874    .0013791
+18#Not woman  |   .0019032   .0001711    11.12   0.000     .0015678    .0022386
+    18#Woman  |   .0010659   .0001193     8.94   0.000     .0008322    .0012997
+19#Not woman  |   .0017913   .0001589    11.27   0.000     .0014798    .0021028
+    19#Woman  |   .0010084   .0001112     9.07   0.000     .0007905    .0012264
+20#Not woman  |   .0016859   .0001484    11.36   0.000     .0013951    .0019768
+    20#Woman  |   .0009539   .0001046     9.12   0.000     .0007489     .001159
+21#Not woman  |   .0015867   .0001393    11.39   0.000     .0013138    .0018597
+    21#Woman  |   .0009022   .0000993     9.08   0.000     .0007076    .0010969
+22#Not woman  |   .0014933   .0001314    11.36   0.000     .0012357    .0017509
+    22#Woman  |   .0008532   .0000951     8.97   0.000     .0006667    .0010396
+23#Not woman  |   .0014053   .0001247    11.27   0.000     .0011608    .0016498
+    23#Woman  |   .0008067   .0000919     8.78   0.000     .0006266    .0009868
+24#Not woman  |   .0013224    .000119    11.11   0.000     .0010892    .0015556
+    24#Woman  |   .0007626   .0000894     8.53   0.000     .0005873    .0009379
+25#Not woman  |   .0012443    .000114    10.91   0.000     .0010208    .0014678
+    25#Woman  |   .0007207   .0000876     8.23   0.000      .000549    .0008924
+26#Not woman  |   .0011706   .0001098    10.66   0.000     .0009555    .0013858
+    26#Woman  |    .000681   .0000862     7.90   0.000      .000512    .0008501
+27#Not woman  |   .0011012   .0001061    10.38   0.000     .0008933    .0013091
+    27#Woman  |   .0006434   .0000852     7.55   0.000     .0004764    .0008104
+28#Not woman  |   .0010358   .0001028    10.07   0.000     .0008342    .0012373
+    28#Woman  |   .0006077   .0000845     7.20   0.000     .0004422    .0007733
+29#Not woman  |   .0009741      .0001     9.75   0.000     .0007782      .00117
+    29#Woman  |   .0005739   .0000838     6.84   0.000     .0004096    .0007382
+30#Not woman  |   .0009159   .0000973     9.41   0.000     .0007251    .0011067
+    30#Woman  |   .0005418   .0000833     6.50   0.000     .0003786    .0007051
+31#Not woman  |    .000861    .000095     9.07   0.000     .0006749    .0010471
+    31#Woman  |   .0005114   .0000828     6.18   0.000     .0003492    .0006737
+32#Not woman  |   .0008092   .0000927     8.73   0.000     .0006275     .000991
+    32#Woman  |   .0004826   .0000822     5.87   0.000     .0003214    .0006438
+33#Not woman  |   .0007604   .0000906     8.39   0.000     .0005828     .000938
+    33#Woman  |   .0004553   .0000817     5.58   0.000     .0002952    .0006154
+34#Not woman  |   .0007144   .0000886     8.06   0.000     .0005407     .000888
+    34#Woman  |   .0004295    .000081     5.30   0.000     .0002707    .0005882
+35#Not woman  |   .0006709   .0000866     7.75   0.000     .0005012    .0008407
+    35#Woman  |    .000405   .0000803     5.04   0.000     .0002476    .0005623
+36#Not woman  |     .00063   .0000847     7.44   0.000      .000464     .000796
+    36#Woman  |   .0003818   .0000795     4.81   0.000     .0002261    .0005375
+37#Not woman  |   .0005914   .0000827     7.15   0.000     .0004292    .0007535
+    37#Woman  |   .0003599   .0000785     4.58   0.000     .0002059    .0005138
+38#Not woman  |    .000555   .0000808     6.87   0.000     .0003966    .0007134
+    38#Woman  |   .0003391   .0000775     4.38   0.000     .0001872     .000491
+39#Not woman  |   .0005207   .0000789     6.60   0.000     .0003661    .0006753
+    39#Woman  |   .0003195   .0000764     4.18   0.000     .0001697    .0004692
+40#Not woman  |   .0004884   .0000769     6.35   0.000     .0003376    .0006391
+    40#Woman  |   .0003009   .0000752     4.00   0.000     .0001536    .0004483
+41#Not woman  |   .0004579    .000075     6.11   0.000      .000311    .0006048
+    41#Woman  |   .0002834   .0000739     3.83   0.000     .0001385    .0004282
+42#Not woman  |   .0004292    .000073     5.88   0.000     .0002862    .0005723
+    42#Woman  |   .0002668   .0000725     3.68   0.000     .0001247    .0004089
+43#Not woman  |   .0004022    .000071     5.67   0.000     .0002631    .0005414
+    43#Woman  |   .0002511   .0000711     3.53   0.000     .0001118    .0003904
+44#Not woman  |   .0003768    .000069     5.46   0.000     .0002416     .000512
+    44#Woman  |   .0002363   .0000696     3.40   0.001        .0001    .0003726
+45#Not woman  |   .0003529    .000067     5.27   0.000     .0002217    .0004841
+    45#Woman  |   .0002224    .000068     3.27   0.001     .0000891    .0003556
+46#Not woman  |   .0003304   .0000649     5.09   0.000     .0002032    .0004577
+    46#Woman  |   .0002092   .0000664     3.15   0.002     .0000791    .0003392
+47#Not woman  |   .0003093   .0000629     4.92   0.000      .000186    .0004326
+    47#Woman  |   .0001967   .0000647     3.04   0.002     .0000699    .0003235
+48#Not woman  |   .0002894   .0000609     4.75   0.000     .0001701    .0004087
+    48#Woman  |    .000185    .000063     2.94   0.003     .0000615    .0003085
+49#Not woman  |   .0002708   .0000588     4.60   0.000     .0001554    .0003861
+    49#Woman  |   .0001739   .0000613     2.84   0.005     .0000538    .0002941
+50#Not woman  |   .0002532   .0000568     4.46   0.000     .0001418    .0003646
+    50#Woman  |   .0001635   .0000596     2.75   0.006     .0000468    .0002802
+51#Not woman  |   .0002368   .0000548     4.32   0.000     .0001293    .0003443
+    51#Woman  |   .0001537   .0000578     2.66   0.008     .0000404     .000267
+52#Not woman  |   .0002214   .0000529     4.19   0.000     .0001177     .000325
+    52#Woman  |   .0001444    .000056     2.58   0.010     .0000346    .0002543
+53#Not woman  |   .0002069   .0000509     4.06   0.000     .0001071    .0003066
+    53#Woman  |   .0001357   .0000543     2.50   0.012     .0000293    .0002421
+54#Not woman  |   .0001933    .000049     3.95   0.000     .0000973    .0002893
+    54#Woman  |   .0001275   .0000525     2.43   0.015     .0000245    .0002305
+55#Not woman  |   .0001806   .0000471     3.84   0.000     .0000883    .0002728
+    55#Woman  |   .0001197   .0000508     2.36   0.018     .0000202    .0002193
+56#Not woman  |   .0001686   .0000452     3.73   0.000       .00008    .0002573
+    56#Woman  |   .0001125   .0000491     2.29   0.022     .0000163    .0002087
+57#Not woman  |   .0001575   .0000434     3.63   0.000     .0000724    .0002425
+    57#Woman  |   .0001056   .0000474     2.23   0.026     .0000128    .0001985
+58#Not woman  |    .000147   .0000416     3.53   0.000     .0000655    .0002286
+    58#Woman  |   .0000992   .0000457     2.17   0.030     9.61e-06    .0001887
+59#Not woman  |   .0001372   .0000399     3.44   0.001     .0000591    .0002153
+    59#Woman  |   .0000931    .000044     2.11   0.034     6.80e-06    .0001794
+60#Not woman  |   .0001281   .0000382     3.36   0.001     .0000533    .0002029
+    60#Woman  |   .0000874   .0000424     2.06   0.039     4.29e-06    .0001705
+61#Not woman  |   .0001195   .0000365     3.27   0.001      .000048     .000191
+    61#Woman  |    .000082   .0000408     2.01   0.044     2.06e-06     .000162
+-------------------------------------------------------------------------------
+
+. marginsplot, ///
+>         title("Predictive margins of posting a manuscript on SocArXiv by autho
+> r gender" ///
+>                 "by years pre- or post-PhD of manuscript publication date") //
+> /
+>         xtitle("Years before (-) or after (+) PhD paper published in WoS") ///
+>         ytitle("Predicted probability of manuscript being posted on SocArXiv")
+>   ///
+>         legend(label(1 "Not woman author" label(2 "Woman author"))) /// 
+>         recastci(rarea) // treat plot as rarea
+
+Variables that uniquely identify margins: years_wospub_phd author_gender_woman
+
+. graph export $results/osf10_osfpublish_careerstage_melogit.jpg, ///
+>         as(jpg) name("Graph") quality(90)  replace
+file
+    ~/Documents/SocResearch/SocArXiv_gender/results/osf10_osfpublish_careersta
+    > ge_melogit.jpg saved as JPG format
+
+. 
+. tab feminist_journal osfpub, m
+
+     Paper |
+ submitted |
+        to |  Paper submitted to
+  feminist |       SocArXiv
+   journal |         0          1 |     Total
+-----------+----------------------+----------
+         0 |   464,215      1,285 |   465,500 
+         1 |     2,559         29 |     2,588 
+         . |         0      1,171 |     1,171 
+-----------+----------------------+----------
+     Total |   466,774      2,485 |   469,259 
+
+.         
+. ***--------------------------***
+. // General open behavior (pub in open journal OR OSF)
+. ***--------------------------***
+. 
+. // MODEL: ALL OA BEHAVIOR
+. 
+. tab open_pub, m
+
+   open_pub |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |    289,014       61.59       61.59
+          1 |    180,245       38.41      100.00
+------------+-----------------------------------
+      Total |    469,259      100.00
+
+. 
+. *Base model
+. melogit open_pub author_gender_woman author_gender_tnb ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -300390.87  
+Iteration 1:  Log likelihood = -299950.53  
+Iteration 2:  Log likelihood = -299950.46  
+Iteration 3:  Log likelihood = -299950.46  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -270874.38
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -270874.38  
+Iteration 1:  Log likelihood = -270727.27  
+Iteration 2:  Log likelihood = -270724.36  
+Iteration 3:  Log likelihood = -270724.36  
+
+Mixed-effects logistic regression               Number of obs     =    450,418
+Group variable: responseid_n                    Number of groups  =     18,861
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       23.9
+                                                              max =      1,100
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(2)      =      14.80
+Log likelihood = -270724.36                     Prob > chi2       =     0.0006
+-------------------------------------------------------------------------------
+     open_pub | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .9850141   .0192061    -0.77   0.439     .9480811    1.023386
+author_g~_tnb |   .6934516   .0666287    -3.81   0.000     .5744211    .8371474
+        _cons |   .5632542   .0069461   -46.55   0.000     .5498034    .5770342
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   1.218578    .019231                      1.181463    1.256859
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 58452.21    Prob >= chibar2 = 0.0000
+
+. estimates store model1
+
+. 
+. * add paper-level controls: 
+. melogit open_pub author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -262682.27  
+Iteration 1:  Log likelihood = -262530.48  
+Iteration 2:  Log likelihood = -262530.42  
+Iteration 3:  Log likelihood = -262530.42  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -236267.18
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -236267.18  
+Iteration 1:  Log likelihood = -235644.96  
+Iteration 2:  Log likelihood =  -235635.5  
+Iteration 3:  Log likelihood = -235635.47  
+Iteration 4:  Log likelihood = -235635.47  
+
+Mixed-effects logistic regression               Number of obs     =    412,027
+Group variable: responseid_n                    Number of groups  =     16,454
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       25.0
+                                                              max =      1,099
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(4)      =   20432.53
+Log likelihood = -235635.47                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+     open_pub | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .8904941   .0188972    -5.47   0.000      .854216    .9283129
+author_g~_tnb |   .5839919   .0633183    -4.96   0.000     .4721901    .7222655
+      pubyear |   1.121823   .0012522   102.98   0.000     1.119372     1.12428
+years_wospu~d |   .9991144   .0008888    -1.00   0.319     .9973738    1.000858
+        _cons |   1.2e-101   2.7e-101  -103.59   0.000     1.5e-103    9.9e-100
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   1.254663   .0206957                      1.214749    1.295889
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 53789.90    Prob >= chibar2 = 0.0000
+
+. estimates store model2
+
+. 
+. * add author-level controls:
+. melogit open_pub author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -259264.89  
+Iteration 1:  Log likelihood = -259124.53  
+Iteration 2:  Log likelihood = -259124.48  
+Iteration 3:  Log likelihood = -259124.48  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -233588.69
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -233588.69  
+Iteration 1:  Log likelihood = -233022.37  
+Iteration 2:  Log likelihood = -233014.48  
+Iteration 3:  Log likelihood = -233014.45  
+Iteration 4:  Log likelihood = -233014.45  
+
+Mixed-effects logistic regression               Number of obs     =    407,830
+Group variable: responseid_n                    Number of groups  =     16,286
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       25.0
+                                                              max =      1,099
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(11)     =   20506.95
+Log likelihood = -233014.45                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+     open_pub | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .8785163   .0186173    -6.11   0.000     .8427744     .915774
+author_g~_tnb |   .5725791   .0616334    -5.18   0.000     .4636717    .7070667
+      pubyear |   1.124817   .0012735   103.89   0.000     1.122324    1.127316
+years_wospu~d |   .9967495   .0009001    -3.61   0.000     .9949868    .9985152
+   race_black |   .6220963   .0416623    -7.09   0.000     .5455718    .7093545
+race_other_~n |   .7060808   .0326175    -7.53   0.000     .6449603    .7729934
+ race_chinese |   .5733669   .0269582   -11.83   0.000     .5228913     .628715
+  race_indian |   .6901939    .044107    -5.80   0.000     .6089405    .7822892
+    race_mena |   .6011866   .0400258    -7.64   0.000     .5276402    .6849843
+  race_latine |   1.072709    .040986     1.84   0.066     .9953125    1.156125
+race_other_~w |   .8410885   .0359466    -4.05   0.000     .7735046    .9145775
+        _cons |   6.4e-104   1.5e-103  -104.49   0.000     7.4e-106    5.5e-102
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   1.226581   .0204032                      1.187237     1.26723
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 52220.05    Prob >= chibar2 = 0.0000
+
+. estimates store model3
+
+. 
+. * add paper published in feminist journal 
+. melogit open_pub author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         feminist_journal ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -259162.99  
+Iteration 1:  Log likelihood = -259024.76  
+Iteration 2:  Log likelihood = -259024.71  
+Iteration 3:  Log likelihood = -259024.71  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -233588.64
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -233588.64  
+Iteration 1:  Log likelihood = -233007.27  
+Iteration 2:  Log likelihood = -232999.09  
+Iteration 3:  Log likelihood = -232999.05  
+Iteration 4:  Log likelihood = -232999.05  
+
+Mixed-effects logistic regression               Number of obs     =    407,830
+Group variable: responseid_n                    Number of groups  =     16,286
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       25.0
+                                                              max =      1,099
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(12)     =   20534.13
+Log likelihood = -232999.05                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+     open_pub | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .8817189   .0186783    -5.94   0.000     .8458597    .9190983
+author_g~_tnb |    .580109   .0624156    -5.06   0.000     .4698145    .7162964
+      pubyear |   1.124823   .0012729   103.95   0.000     1.122331    1.127321
+years_wospu~d |   .9967479   .0008994    -3.61   0.000     .9949868    .9985123
+   race_black |   .6224116   .0416509    -7.09   0.000     .5459042    .7096413
+race_other_~n |   .7057317   .0325751    -7.55   0.000     .6446886    .7725548
+ race_chinese |   .5726231   .0269014   -11.87   0.000     .5222519    .6278526
+  race_indian |   .6907651   .0441093    -5.79   0.000     .6095036    .7828606
+    race_mena |   .6015159   .0400159    -7.64   0.000     .5279841    .6852883
+  race_latine |   1.072307   .0409364     1.83   0.067     .9950009    1.155619
+race_other_~w |   .8409602   .0359114    -4.06   0.000       .77344    .9143747
+feminist_jo~l |   .7315073    .041792    -5.47   0.000      .654016    .8181801
+        _cons |   6.3e-104   1.4e-103  -104.55   0.000     7.4e-106    5.4e-102
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   1.223965   .0203702                      1.184685    1.264549
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 52051.32    Prob >= chibar2 = 0.0000
+
+. estimates store model4
+
+. 
+. etable, estimates(model1 model2 model3 model4) ///
+>         mstat(N) mstat(r2_a) column(index) ///
+>         showstars showstarsnote stars(.05 "*" .01 "**" .001 "***", attach(_r_b
+> )) ///
+>         title("Mixed Effects Logistic Regression predicting OA journal + SocAr
+> Xiv (ORs)") ///
+>         export($results/osf10_oa.docx, as(docx) replace)
+
+Mixed Effects Logistic Regression predicting OA journal + SocArXiv (ORs)
+--------------------------------------------------------------------------------------------------------------------------------
+                                                                                      1           2           3           4     
+--------------------------------------------------------------------------------------------------------------------------------
+Author woman                                                                       0.985       0.890 ***   0.879 ***   0.882 ***
+                                                                                 (0.019)     (0.019)     (0.019)     (0.019)    
+Author trans/nonbinary                                                             0.693 ***   0.584 ***   0.573 ***   0.580 ***
+                                                                                 (0.067)     (0.063)     (0.062)     (0.062)    
+pubyear                                                                                        1.122 ***   1.125 ***   1.125 ***
+                                                                                             (0.001)     (0.001)     (0.001)    
+Years after PhD published in WoS                                                               0.999       0.997 ***   0.997 ***
+                                                                                             (0.001)     (0.001)     (0.001)    
+Black or African American                                                                                  0.622 ***   0.622 ***
+                                                                                                         (0.042)     (0.042)    
+Other Asian                                                                                                0.706 ***   0.706 ***
+                                                                                                         (0.033)     (0.033)    
+Chinese                                                                                                    0.573 ***   0.573 ***
+                                                                                                         (0.027)     (0.027)    
+Indian                                                                                                     0.690 ***   0.691 ***
+                                                                                                         (0.044)     (0.044)    
+Middle Eastern or North African                                                                            0.601 ***   0.602 ***
+                                                                                                         (0.040)     (0.040)    
+Hispanic, Spanish, or Latina/o/x                                                                           1.073       1.072    
+                                                                                                         (0.041)     (0.041)    
+Other Race / American Indian / Alaska Native or Native Hawiian / Pacific Islande                           0.841 ***   0.841 ***
+                                                                                                         (0.036)     (0.036)    
+Paper submitted to feminist journal                                                                                    0.732 ***
+                                                                                                                     (0.042)    
+Intercept                                                                          0.563 ***   0.000 ***   0.000 ***   0.000 ***
+                                                                                 (0.007)     (0.000)     (0.000)     (0.000)    
+var(_cons[responseid_n])                                                           1.219       1.255       1.227       1.224    
+                                                                                 (0.019)     (0.021)     (0.020)     (0.020)    
+Number of observations                                                            450418      412027      407830      407830    
+--------------------------------------------------------------------------------------------------------------------------------
+*** p<.001, ** p<.01, * p<.05
+(collection ETable exported to file
+ ~/Documents/SocResearch/SocArXiv_gender/results/osf10_oa.docx)
+
+. 
+. 
+. // MODEL: GREEN OA
+.         
+. tab open_green, m       
+
+ open_green |      Freq.     Percent        Cum.
+------------+-----------------------------------
+          0 |     39,838        8.49        8.49
+          1 |    140,407       29.92       38.41
+          . |    289,014       61.59      100.00
+------------+-----------------------------------
+      Total |    469,259      100.00
+
+.         
+. * Base model
+. melogit open_green author_gender_woman author_gender_tnb  ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood =  -91228.98  
+Iteration 1:  Log likelihood = -91095.656  
+Iteration 2:  Log likelihood = -91095.545  
+Iteration 3:  Log likelihood = -91095.545  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -82685.231
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -82685.231  
+Iteration 1:  Log likelihood = -82449.217  
+Iteration 2:  Log likelihood = -82448.118  
+Iteration 3:  Log likelihood = -82448.118  
+
+Mixed-effects logistic regression               Number of obs     =    173,072
+Group variable: responseid_n                    Number of groups  =     16,848
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       10.3
+                                                              max =        708
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(2)      =      53.76
+Log likelihood = -82448.118                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+   open_green | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .8446219   .0231388    -6.16   0.000     .8004667    .8912128
+author_g~_tnb |    .548814   .0761866    -4.32   0.000     .4180815    .7204261
+        _cons |   4.082302   .0708398    81.06   0.000     3.945793    4.223533
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   1.644939   .0374316                      1.573187    1.719965
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 17294.85    Prob >= chibar2 = 0.0000
+
+. estimates store model1
+
+. 
+. * add paper-level controls
+. melogit open_green author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -81989.299  
+Iteration 1:  Log likelihood = -81845.558  
+Iteration 2:  Log likelihood =  -81845.42  
+Iteration 3:  Log likelihood =  -81845.42  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -74465.487
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -74465.487  
+Iteration 1:  Log likelihood = -74291.605  
+Iteration 2:  Log likelihood = -74288.298  
+Iteration 3:  Log likelihood = -74288.297  
+
+Mixed-effects logistic regression               Number of obs     =    157,326
+Group variable: responseid_n                    Number of groups  =     14,899
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       10.6
+                                                              max =        707
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(4)      =    1142.76
+Log likelihood = -74288.297                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+   open_green | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .8564329   .0246783    -5.38   0.000     .8094048    .9061935
+author_g~_tnb |   .5673964   .0857746    -3.75   0.000     .4218989    .7630706
+      pubyear |   .9479166    .001823   -27.81   0.000     .9443504    .9514963
+years_wospu~d |   .9973479    .001215    -2.18   0.029     .9949693    .9997322
+        _cons |   3.15e+47   1.22e+48    28.25   0.000     1.59e+44    6.22e+50
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   1.561414   .0377545                      1.489142    1.637192
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 15114.25    Prob >= chibar2 = 0.0000
+
+. estimates store model2
+
+. 
+. * add author-level controls
+. melogit open_green author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -81100.048  
+Iteration 1:  Log likelihood = -80960.523  
+Iteration 2:  Log likelihood = -80960.396  
+Iteration 3:  Log likelihood = -80960.396  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -73734.243
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -73734.243  
+Iteration 1:  Log likelihood = -73564.975  
+Iteration 2:  Log likelihood = -73559.821  
+Iteration 3:  Log likelihood =  -73559.82  
+
+Mixed-effects logistic regression               Number of obs     =    155,754
+Group variable: responseid_n                    Number of groups  =     14,741
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       10.6
+                                                              max =        707
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(11)     =    1247.73
+Log likelihood = -73559.82                      Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+   open_green | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |    .849738   .0245656    -5.63   0.000      .802929    .8992758
+author_g~_tnb |    .555739   .0836399    -3.90   0.000     .4137741    .7464117
+      pubyear |   .9498376   .0018461   -26.48   0.000     .9462261    .9534629
+years_wospu~d |   .9957759   .0012344    -3.41   0.001     .9933595    .9981981
+   race_black |   .6006902    .055799    -5.49   0.000     .5007041    .7206427
+race_other_~n |   .6402723   .0406205    -7.03   0.000     .5654084    .7250487
+ race_chinese |   .7706265   .0500954    -4.01   0.000     .6784388    .8753408
+  race_indian |   1.053475   .0963015     0.57   0.569     .8806704    1.260188
+    race_mena |     .72146   .0670319    -3.51   0.000      .601348    .8655629
+  race_latine |   1.197134    .062712     3.43   0.001      1.08032    1.326579
+race_other_~w |   .8257359   .0477696    -3.31   0.001     .7372221     .924877
+        _cons |   5.69e+45   2.23e+46    26.93   0.000     2.66e+42    1.22e+49
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   1.539502   .0374979                      1.467734    1.614779
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 14801.15    Prob >= chibar2 = 0.0000
+
+. estimates store model3
+
+. 
+. * add paper published in feminist journal 
+. melogit open_green author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         feminist_journal ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -81081.276  
+Iteration 1:  Log likelihood = -80942.515  
+Iteration 2:  Log likelihood =  -80942.39  
+Iteration 3:  Log likelihood =  -80942.39  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -73721.078
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -73721.078  
+Iteration 1:  Log likelihood = -73551.981  
+Iteration 2:  Log likelihood = -73546.847  
+Iteration 3:  Log likelihood = -73546.846  
+
+Mixed-effects logistic regression               Number of obs     =    155,754
+Group variable: responseid_n                    Number of groups  =     14,741
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       10.6
+                                                              max =        707
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(12)     =    1274.43
+Log likelihood = -73546.846                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+   open_green | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .8538703    .024697    -5.46   0.000     .8068115    .9036739
+author_g~_tnb |     .57261   .0862442    -3.70   0.000     .4262402    .7692428
+      pubyear |   .9499017   .0018462   -26.44   0.000       .94629    .9535271
+years_wospu~d |   .9958131   .0012343    -3.39   0.001     .9933968    .9982352
+   race_black |   .6016176   .0558848    -5.47   0.000     .5014778    .7217542
+race_other_~n |   .6398985   .0405934    -7.04   0.000     .5650843    .7246178
+ race_chinese |   .7692849   .0500028    -4.04   0.000     .6772669     .873805
+  race_indian |   1.053255   .0962679     0.57   0.570     .8805081    1.259893
+    race_mena |   .7219146   .0670701    -3.51   0.000     .6017334    .8660989
+  race_latine |   1.196597    .062679     3.43   0.001     1.079844    1.325973
+race_other_~w |   .8258717   .0477751    -3.31   0.001     .7373476    .9250239
+feminist_jo~l |   .5666157   .0621584    -5.18   0.000     .4569944    .7025325
+        _cons |   4.97e+45   1.94e+46    26.90   0.000     2.32e+42    1.06e+49
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   1.538923   .0374893                      1.467171    1.614183
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 14791.09    Prob >= chibar2 = 0.0000
+
+. estimates store model4
+
+. 
+. etable, estimates(model1 model2 model3 model4) ///
+>         mstat(N) mstat(r2_a) column(index) ///
+>         showstars showstarsnote stars(.05 "*" .01 "**" .001 "***", attach(_r_b
+> )) ///
+>         title("Mixed Effects Logistic Regression predicting green OA + SocArXi
+> v (ORs)") ///
+>         export($results/osf10_oagreen_appendix.docx, as(docx) replace)
+
+Mixed Effects Logistic Regression predicting green OA + SocArXiv (ORs)
+-----------------------------------------------------------------------------------------------------------------------------------------
+                                                                                      1             2              3              4      
+-----------------------------------------------------------------------------------------------------------------------------------------
+Author woman                                                                       0.845 ***      0.856 ***      0.850 ***      0.854 ***
+                                                                                 (0.023)        (0.025)        (0.025)        (0.025)    
+Author trans/nonbinary                                                             0.549 ***      0.567 ***      0.556 ***      0.573 ***
+                                                                                 (0.076)        (0.086)        (0.084)        (0.086)    
+pubyear                                                                                           0.948 ***      0.950 ***      0.950 ***
+                                                                                                (0.002)        (0.002)        (0.002)    
+Years after PhD published in WoS                                                                  0.997 *        0.996 ***      0.996 ***
+                                                                                                (0.001)        (0.001)        (0.001)    
+Black or African American                                                                                        0.601 ***      0.602 ***
+                                                                                                               (0.056)        (0.056)    
+Other Asian                                                                                                      0.640 ***      0.640 ***
+                                                                                                               (0.041)        (0.041)    
+Chinese                                                                                                          0.771 ***      0.769 ***
+                                                                                                               (0.050)        (0.050)    
+Indian                                                                                                           1.053          1.053    
+                                                                                                               (0.096)        (0.096)    
+Middle Eastern or North African                                                                                  0.721 ***      0.722 ***
+                                                                                                               (0.067)        (0.067)    
+Hispanic, Spanish, or Latina/o/x                                                                                 1.197 ***      1.197 ***
+                                                                                                               (0.063)        (0.063)    
+Other Race / American Indian / Alaska Native or Native Hawiian / Pacific Islande                                 0.826 ***      0.826 ***
+                                                                                                               (0.048)        (0.048)    
+Paper submitted to feminist journal                                                                                             0.567 ***
+                                                                                                                              (0.062)    
+Intercept                                                                          4.082 ***   3.15e+47 ***   5.69e+45 ***   4.97e+45 ***
+                                                                                 (0.071)     (1.22e+48)     (2.23e+46)     (1.94e+46)    
+var(_cons[responseid_n])                                                           1.645          1.561          1.540          1.539    
+                                                                                 (0.037)        (0.038)        (0.037)        (0.037)    
+Number of observations                                                            173072         157326         155754         155754    
+-----------------------------------------------------------------------------------------------------------------------------------------
+*** p<.001, ** p<.01, * p<.05
+(collection ETable exported to file
+ ~/Documents/SocResearch/SocArXiv_gender/results/osf10_oagreen_appendix.docx)
+
+. 
+.         
+. * green compared to all papers
+. melogit is_green author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         feminist_journal ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -242469.36  
+Iteration 1:  Log likelihood = -242070.99  
+Iteration 2:  Log likelihood = -242070.86  
+Iteration 3:  Log likelihood = -242070.86  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -213768.01
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -213768.01  
+Iteration 1:  Log likelihood = -212764.88  
+Iteration 2:  Log likelihood = -212693.02  
+Iteration 3:  Log likelihood = -212691.86  
+Iteration 4:  Log likelihood = -212691.86  
+
+Mixed-effects logistic regression               Number of obs     =    407,830
+Group variable: responseid_n                    Number of groups  =     16,286
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       25.0
+                                                              max =      1,099
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(12)     =   10868.42
+Log likelihood = -212691.86                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+     is_green | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .8409722   .0204952    -7.11   0.000     .8017466    .8821168
+author_g~_tnb |   .4840744    .061225    -5.74   0.000     .3777926    .6202558
+      pubyear |   1.093833   .0013725    71.48   0.000     1.091146    1.096526
+years_wospu~d |   .9960239    .001034    -3.84   0.000     .9939994    .9980524
+   race_black |   .5376075   .0419138    -7.96   0.000     .4614266    .6263658
+race_other_~n |   .6157022   .0330251    -9.04   0.000     .5542604    .6839551
+ race_chinese |     .56903   .0309382   -10.37   0.000     .5115113    .6330166
+  race_indian |   .7292037   .0536548    -4.29   0.000     .6312733    .8423262
+    race_mena |   .5632115   .0435026    -7.43   0.000     .4840882    .6552674
+  race_latine |   1.144477   .0498731     3.10   0.002     1.050786    1.246523
+race_other_~w |   .8074919   .0397965    -4.34   0.000      .733141    .8893831
+feminist_jo~l |   .6281648    .041705    -7.00   0.000     .5515194    .7154618
+        _cons |   1.10e-79   2.77e-79   -72.16   0.000     7.88e-82    1.53e-77
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|    1.64192   .0278574                      1.588218    1.697437
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 58758.01    Prob >= chibar2 = 0.0000
+
+. 
+.         
+. * green compared to all papers
+. melogit is_green author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         feminist_journal#author_gender_woman ///
+>         || responseid_n: , or
+note: 1.feminist_journal#1.author_gender_woman omitted because of collinearity.
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -242462.65  
+Iteration 1:  Log likelihood = -242063.05  
+Iteration 2:  Log likelihood = -242062.92  
+Iteration 3:  Log likelihood = -242062.92  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -213760.02
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -213760.02  
+Iteration 1:  Log likelihood = -212756.85  
+Iteration 2:  Log likelihood = -212684.99  
+Iteration 3:  Log likelihood = -212683.82  
+Iteration 4:  Log likelihood = -212683.82  
+
+Mixed-effects logistic regression               Number of obs     =    407,830
+Group variable: responseid_n                    Number of groups  =     16,286
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       25.0
+                                                              max =      1,099
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(13)     =   10880.16
+Log likelihood = -212683.82                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+     is_green | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .4503268   .0370291    -9.70   0.000     .3832974    .5290778
+author_g~_tnb |   .4765041   .0602921    -5.86   0.000     .3718468    .6106176
+      pubyear |   1.093797   .0013725    71.45   0.000     1.091111    1.096491
+years_wospu~d |    .996043    .001034    -3.82   0.000     .9940185    .9980717
+   race_black |   .5376316   .0419162    -7.96   0.000     .4614464     .626395
+race_other_~n |   .6159084   .0330367    -9.04   0.000     .5544451    .6841852
+ race_chinese |    .568787   .0309254   -10.38   0.000     .5112923    .6327471
+  race_indian |   .7294948   .0536778    -4.29   0.000     .6315226     .842666
+    race_mena |   .5631816   .0435005    -7.43   0.000     .4840622     .655233
+  race_latine |   1.144715   .0498841     3.10   0.002     1.051002    1.246782
+race_other_~w |   .8075053    .039798    -4.34   0.000     .7331516    .8893997
+              |
+feminist_jo~l#|
+author_g~oman |
+     0#Woman  |    1.87252   .1486409     7.90   0.000     1.602721    2.187736
+ 1#Not woman  |   .9669827   .1187272    -0.27   0.785     .7601639    1.230071
+     1#Woman  |          1  (omitted)
+              |
+        _cons |   1.17e-79   2.95e-79   -72.14   0.000     8.40e-82    1.63e-77
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|    1.64194   .0278573                      1.588238    1.697457
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 58758.19    Prob >= chibar2 = 0.0000
+
+. 
+. * get count for footnote
+. keep if osfpub == 1 & feminist_journal == 1
+(469,230 observations deleted)
+
+. count
+  29
+
+.         
+. ***--------------------------***
+. // Preprint / postprint
+. ***--------------------------***
+. 
+. use $clean/survey_authors_papers.dta, clear
+
+. 
+. *Base model
+. melogit preprint author_gender_woman author_gender_tnb ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -821.18989  
+Iteration 1:  Log likelihood = -815.84739  
+Iteration 2:  Log likelihood = -815.83898  
+Iteration 3:  Log likelihood = -815.83898  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -784.29573
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -784.29573  
+Iteration 1:  Log likelihood = -764.74022  
+Iteration 2:  Log likelihood = -762.85486  
+Iteration 3:  Log likelihood = -762.82463  
+Iteration 4:  Log likelihood =  -762.8247  
+Iteration 5:  Log likelihood =  -762.8247  
+
+Mixed-effects logistic regression               Number of obs     =      2,386
+Group variable: responseid_n                    Number of groups  =        879
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =        2.7
+                                                              max =         47
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(2)      =       1.45
+Log likelihood = -762.8247                      Prob > chi2       =     0.4849
+-------------------------------------------------------------------------------
+     preprint | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   1.040856   .2505956     0.17   0.868     .6493163    1.668497
+author_g~_tnb |   .3724989   .3141931    -1.17   0.242     .0713114    1.945769
+        _cons |   21.56844   4.584879    14.45   0.000     14.21922    32.71611
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   2.833772   .6577624                      1.797992    4.466239
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 106.03      Prob >= chibar2 = 0.0000
+
+. estimates store model1
+
+. 
+. * add paper-level controls
+. melogit preprint author_gender_woman author_gender_tnb ///
+>         $paper_level_controls  ///
+>         || responseid_n:  , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -424.76432  
+Iteration 1:  Log likelihood = -403.60546  
+Iteration 2:  Log likelihood = -403.58224  
+Iteration 3:  Log likelihood = -403.58224  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -402.13095
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -402.13095  
+Iteration 1:  Log likelihood = -399.63235  
+Iteration 2:  Log likelihood = -399.46182  
+Iteration 3:  Log likelihood = -399.46048  
+Iteration 4:  Log likelihood = -399.46048  
+
+Mixed-effects logistic regression               Number of obs     =      1,170
+Group variable: responseid_n                    Number of groups  =        510
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =        2.3
+                                                              max =         18
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(4)      =     143.73
+Log likelihood = -399.46048                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+     preprint | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   1.164893   .2965994     0.60   0.549     .7072242    1.918734
+author_g~_tnb |   .6100678   .5802888    -0.52   0.603      .094564    3.935775
+      pubyear |   2.088512   .1312967    11.71   0.000     1.846397    2.362374
+years_wospu~d |   1.009508   .0131849     0.72   0.469      .983994    1.035684
+        _cons |          0          0   -11.71   0.000            0           0
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   .9133448   .4856674                      .3221157    2.589749
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 8.24        Prob >= chibar2 = 0.0020
+
+. estimates store model2
+
+. 
+. * add author-level controls
+. melogit preprint author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         || responseid_n: , or
+note: race_black != 0 predicts success perfectly;
+      race_black omitted and 7 obs not used.
+
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -413.97226  
+Iteration 1:  Log likelihood = -391.09489  
+Iteration 2:  Log likelihood = -391.05778  
+Iteration 3:  Log likelihood = -391.05778  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -390.60265
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -390.60265  
+Iteration 1:  Log likelihood = -388.71946  
+Iteration 2:  Log likelihood = -387.91117  
+Iteration 3:  Log likelihood =  -387.9008  
+Iteration 4:  Log likelihood =  -387.9008  
+
+Mixed-effects logistic regression               Number of obs     =      1,148
+Group variable: responseid_n                    Number of groups  =        498
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =        2.3
+                                                              max =         18
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(10)     =     149.33
+Log likelihood = -387.9008                      Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+     preprint | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |    1.25553   .3194088     0.89   0.371     .7625707     2.06716
+author_g~_tnb |   .5988188   .5569025    -0.55   0.581     .0967557    3.706076
+      pubyear |   2.115456   .1335123    11.87   0.000     1.869314    2.394008
+years_wospu~d |   1.006647   .0131405     0.51   0.612     .9812191    1.032735
+   race_black |          1  (omitted)
+race_other_~n |    1.56387   1.153729     0.61   0.544     .3683287    6.639963
+ race_chinese |   .1450874   .1028679    -2.72   0.006     .0361512    .5822871
+  race_indian |   .1643428   .1415005    -2.10   0.036      .030399    .8884685
+    race_mena |   1.998593   1.860533     0.74   0.457     .3223461    12.39157
+  race_latine |   1.080563   .5560668     0.15   0.880     .3941072    2.962685
+race_other_~w |   .5697032   .3416526    -0.94   0.348     .1758655    1.845511
+        _cons |          0          0   -11.87   0.000            0           0
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   .7588942   .4432215                      .2415733     2.38404
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 6.31        Prob >= chibar2 = 0.0060
+
+. estimates store model3
+
+. 
+. * add paper published in feminist journal 
+. melogit open_pub author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         feminist_journal ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -259162.99  
+Iteration 1:  Log likelihood = -259024.76  
+Iteration 2:  Log likelihood = -259024.71  
+Iteration 3:  Log likelihood = -259024.71  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -233588.64
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -233588.64  
+Iteration 1:  Log likelihood = -233007.27  
+Iteration 2:  Log likelihood = -232999.09  
+Iteration 3:  Log likelihood = -232999.05  
+Iteration 4:  Log likelihood = -232999.05  
+
+Mixed-effects logistic regression               Number of obs     =    407,830
+Group variable: responseid_n                    Number of groups  =     16,286
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =       25.0
+                                                              max =      1,099
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(12)     =   20534.13
+Log likelihood = -232999.05                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+     open_pub | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .8817189   .0186783    -5.94   0.000     .8458597    .9190983
+author_g~_tnb |    .580109   .0624156    -5.06   0.000     .4698145    .7162964
+      pubyear |   1.124823   .0012729   103.95   0.000     1.122331    1.127321
+years_wospu~d |   .9967479   .0008994    -3.61   0.000     .9949868    .9985123
+   race_black |   .6224116   .0416509    -7.09   0.000     .5459042    .7096413
+race_other_~n |   .7057317   .0325751    -7.55   0.000     .6446886    .7725548
+ race_chinese |   .5726231   .0269014   -11.87   0.000     .5222519    .6278526
+  race_indian |   .6907651   .0441093    -5.79   0.000     .6095036    .7828606
+    race_mena |   .6015159   .0400159    -7.64   0.000     .5279841    .6852883
+  race_latine |   1.072307   .0409364     1.83   0.067     .9950009    1.155619
+race_other_~w |   .8409602   .0359114    -4.06   0.000       .77344    .9143747
+feminist_jo~l |   .7315073    .041792    -5.47   0.000      .654016    .8181801
+        _cons |   6.3e-104   1.4e-103  -104.55   0.000     7.4e-106    5.4e-102
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   1.223965   .0203702                      1.184685    1.264549
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 52051.32    Prob >= chibar2 = 0.0000
+
+. estimates store model4
+
+. 
+. // Preprint / postprint - Whether interaction with career stage and gender
+. * add other paper-level controls
+. melogit preprint author_gender_woman##c.years_wospub_phd author_gender_tnb ///
+>         $paper_level_controls  ///
+>         || responseid_n: , or
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -424.51996  
+Iteration 1:  Log likelihood = -403.40391  
+Iteration 2:  Log likelihood = -403.38083  
+Iteration 3:  Log likelihood = -403.38083  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -401.94087
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -401.94087  
+Iteration 1:  Log likelihood =   -399.442  
+Iteration 2:  Log likelihood = -399.25576  
+Iteration 3:  Log likelihood = -399.25466  
+Iteration 4:  Log likelihood = -399.25467  
+
+Mixed-effects logistic regression               Number of obs     =      1,170
+Group variable: responseid_n                    Number of groups  =        510
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =        2.3
+                                                              max =         18
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(5)      =     144.06
+Log likelihood = -399.25467                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+     preprint | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |
+       Woman  |   1.382691   .5113286     0.88   0.381     .6697993    2.854337
+years_wospu~d |   1.014511   .0155778     0.94   0.348     .9844337    1.045507
+              |
+author_g~oman#|
+           c. |
+years_wospu~d |
+       Woman  |   .9814653   .0285009    -0.64   0.519     .9271645    1.038946
+              |
+author_g~_tnb |   .6275677    .597792    -0.49   0.625     .0970164     4.05953
+      pubyear |   2.084824   .1308235    11.71   0.000     1.843555    2.357667
+        _cons |          0          0   -11.70   0.000            0           0
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   .9033007   .4806934                      .3183197     2.56331
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 8.25        Prob >= chibar2 = 0.0020
+
+. estimates store model2cs_int
+
+. 
+. * add author-level controls: org status, race, profile claimed
+. melogit preprint author_gender_woman##c.years_wospub_phd author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         || responseid_n: , or
+note: race_black != 0 predicts success perfectly;
+      race_black omitted and 7 obs not used.
+
+
+Fitting fixed-effects model:
+
+Iteration 0:  Log likelihood = -413.73175  
+Iteration 1:  Log likelihood = -390.92375  
+Iteration 2:  Log likelihood = -390.88723  
+Iteration 3:  Log likelihood = -390.88723  
+
+Refining starting values:
+
+Grid node 0:  Log likelihood = -390.46767
+
+Fitting full model:
+
+Iteration 0:  Log likelihood = -390.46767  
+Iteration 1:  Log likelihood = -388.67972  
+Iteration 2:  Log likelihood =  -387.7549  
+Iteration 3:  Log likelihood = -387.74377  
+Iteration 4:  Log likelihood = -387.74377  
+
+Mixed-effects logistic regression               Number of obs     =      1,148
+Group variable: responseid_n                    Number of groups  =        498
+
+                                                Obs per group:
+                                                              min =          1
+                                                              avg =        2.3
+                                                              max =         18
+
+Integration method: mvaghermite                 Integration pts.  =          7
+
+                                                Wald chi2(11)     =     149.67
+Log likelihood = -387.74377                     Prob > chi2       =     0.0000
+-------------------------------------------------------------------------------
+     preprint | Odds ratio   Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |
+       Woman  |   1.456524   .5356852     1.02   0.307     .7083694    2.994852
+years_wospu~d |    1.01095   .0154302     0.71   0.476     .9811548    1.041649
+              |
+author_g~oman#|
+           c. |
+years_wospu~d |
+       Woman  |   .9839393   .0283035    -0.56   0.574     .9300002    1.041007
+              |
+author_g~_tnb |   .6136076   .5712957    -0.52   0.600     .0989429     3.80537
+      pubyear |   2.111684   .1330666    11.86   0.000      1.86634    2.389279
+   race_black |          1  (omitted)
+race_other_~n |   1.562541   1.152194     0.61   0.545     .3682718    6.629709
+ race_chinese |   .1461695   .1032349    -2.72   0.006     .0366168    .5834899
+  race_indian |   .1618709   .1394126    -2.11   0.034     .0299271    .8755335
+    race_mena |   2.037563   1.893928     0.77   0.444     .3295441     12.5982
+  race_latine |   1.080428   .5547932     0.15   0.880     .3949196    2.955852
+race_other_~w |   .5665251   .3387829    -0.95   0.342     .1754685    1.829107
+        _cons |          0          0   -11.86   0.000            0           0
+--------------+----------------------------------------------------------------
+responseid_n  |
+    var(_cons)|   .7493239   .4388328                      .2377789     2.36138
+-------------------------------------------------------------------------------
+Note: Estimates are transformed only in the first equation to odds ratios.
+Note: _cons estimates baseline odds (conditional on zero random effects).
+LR test vs. logistic model: chibar2(01) = 6.29        Prob >= chibar2 = 0.0061
+
+. estimates store model3cs_int
+
+. 
+. etable, estimates(model1 model2 model3 model4 model2cs_int model3cs_int) ///
+>         mstat(N) mstat(r2_a) column(index) ///
+>         showstars showstarsnote stars(.05 "*" .01 "**" .001 "***", attach(_r_b
+> )) ///
+>         title("Mixed Effects Logistic Regression predicting paper preprint (OR
+> s)") ///
+>         export($results/osf10_preprint.docx, as(docx) replace)
+
+Mixed Effects Logistic Regression predicting paper preprint (ORs)
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                      1           2           3           4           5           6     
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+Author woman                                                                       1.041       1.165       1.256                                        
+                                                                                 (0.251)     (0.297)     (0.319)                                        
+Author trans/nonbinary                                                             0.372       0.610       0.599                   0.628       0.614    
+                                                                                 (0.314)     (0.580)     (0.557)                 (0.598)     (0.571)    
+pubyear                                                                                        2.089 ***   2.115 ***               2.085 ***   2.112 ***
+                                                                                             (0.131)     (0.134)                 (0.131)     (0.133)    
+Years after PhD published in WoS                                                               1.010       1.007                   1.015       1.011    
+                                                                                             (0.013)     (0.013)                 (0.016)     (0.015)    
+Other Asian                                                                                                1.564                               1.563    
+                                                                                                         (1.154)                             (1.152)    
+Chinese                                                                                                    0.145 **                            0.146 ** 
+                                                                                                         (0.103)                             (0.103)    
+Indian                                                                                                     0.164 *                             0.162 *  
+                                                                                                         (0.142)                             (0.139)    
+Middle Eastern or North African                                                                            1.999                               2.038    
+                                                                                                         (1.861)                             (1.894)    
+Hispanic, Spanish, or Latina/o/x                                                                           1.081                               1.080    
+                                                                                                         (0.556)                             (0.555)    
+Other Race / American Indian / Alaska Native or Native Hawiian / Pacific Islande                           0.570                               0.567    
+                                                                                                         (0.342)                             (0.339)    
+Author woman                                                                                                                                            
+  Woman                                                                                                                            1.383       1.457    
+                                                                                                                                 (0.511)     (0.536)    
+Author woman # Years after PhD published in WoS                                                                                                         
+  Woman                                                                                                                            0.981       0.984    
+                                                                                                                                 (0.029)     (0.028)    
+Intercept                                                                         21.568 ***   0.000 ***   0.000 ***               0.000 ***   0.000 ***
+                                                                                 (4.585)     (0.000)     (0.000)                 (0.000)     (0.000)    
+var(_cons[responseid_n])                                                           2.834       0.913       0.759       1.224       0.903       0.749    
+                                                                                 (0.658)     (0.486)     (0.443)     (0.020)     (0.481)     (0.439)    
+Author woman                                                                                                           0.882 ***                        
+                                                                                                                     (0.019)                            
+Author trans/nonbinary                                                                                                 0.580 ***                        
+                                                                                                                     (0.062)                            
+pubyear                                                                                                                1.125 ***                        
+                                                                                                                     (0.001)                            
+Years after PhD published in WoS                                                                                       0.997 ***                        
+                                                                                                                     (0.001)                            
+Other Asian                                                                                                            0.706 ***                        
+                                                                                                                     (0.033)                            
+Chinese                                                                                                                0.573 ***                        
+                                                                                                                     (0.027)                            
+Indian                                                                                                                 0.691 ***                        
+                                                                                                                     (0.044)                            
+Middle Eastern or North African                                                                                        0.602 ***                        
+                                                                                                                     (0.040)                            
+Hispanic, Spanish, or Latina/o/x                                                                                       1.072                            
+                                                                                                                     (0.041)                            
+Other Race / American Indian / Alaska Native or Native Hawiian / Pacific Islande                                       0.841 ***                        
+                                                                                                                     (0.036)                            
+Black or African American                                                                                              0.622 ***                        
+                                                                                                                     (0.042)                            
+Paper submitted to feminist journal                                                                                    0.732 ***                        
+                                                                                                                     (0.042)                            
+Intercept                                                                                                              0.000 ***                        
+                                                                                                                     (0.000)                            
+Number of observations                                                              2386        1170        1148      407830        1170        1148    
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+*** p<.001, ** p<.01, * p<.05
+(collection ETable exported to file
+ ~/Documents/SocResearch/SocArXiv_gender/results/osf10_preprint.docx)
+
+. 
+. 
+. ***--------------------------***
+. // Years between OSF submission and publication
+. ***--------------------------***
+. * Proxy for quality: Shorter time to publication (only works in field where ev
+> eryone preprints everything like CS) - also speaks to confidence
+. * coef negative: reduces number of years from preprint to publication
+. 
+. des years_wospub_osfpub, det
+
+Variable      Storage   Display    Value
+    name         type    format    label      Variable label
+--------------------------------------------------------------------------------
+years_wospub_~b float   %9.0g                 Years OSF submit - WoS pub (+ osf
+                                                posted after pub; - osf preprint
+                                                before pub)
+
+. hist years_wospub_osfpub, by(author_gender_wtnb, cols(1))
+
+. 
+. *Base model
+. mixed years_wospub_osfpub author_gender_woman author_gender_tnb ///
+>         || responseid_n:
+
+Performing EM optimization ...
+
+Performing gradient-based optimization: 
+Iteration 0:  Log likelihood = -2555.6558  
+Iteration 1:  Log likelihood = -2555.5723  
+Iteration 2:  Log likelihood = -2555.5723  
+
+Computing standard errors ...
+
+Mixed-effects ML regression                          Number of obs    =  1,278
+Group variable: responseid_n                         Number of groups =    573
+                                                     Obs per group:
+                                                                  min =      1
+                                                                  avg =    2.2
+                                                                  max =     18
+                                                     Wald chi2(2)     =   1.00
+Log likelihood = -2555.5723                          Prob > chi2      = 0.6055
+
+-------------------------------------------------------------------------------
+years_wospu~b | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |   .1368073   .1370431     1.00   0.318    -.1317923    .4054069
+author_g~_tnb |   .0890148   .5750089     0.15   0.877    -1.037982    1.216012
+        _cons |  -.5924125   .0760145    -7.79   0.000    -.7413982   -.4434267
+-------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+responseid_n: Identity       |
+                  var(_cons) |   .7580222   .1149031      .5631894    1.020257
+-----------------------------+------------------------------------------------
+               var(Residual) |   2.617189   .1236668      2.385692     2.87115
+------------------------------------------------------------------------------
+LR test vs. linear model: chibar2(01) = 103.59        Prob >= chibar2 = 0.0000
+
+. estimates store model1
+
+. 
+. * add paper-level controls
+. mixed years_wospub_osfpub author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         || responseid_n: 
+
+Performing EM optimization ...
+
+Performing gradient-based optimization: 
+Iteration 0:  Log likelihood = -1861.3004  
+Iteration 1:  Log likelihood = -1861.2354  
+Iteration 2:  Log likelihood = -1861.2354  
+
+Computing standard errors ...
+
+Mixed-effects ML regression                         Number of obs    =   1,170
+Group variable: responseid_n                        Number of groups =     510
+                                                    Obs per group:
+                                                                 min =       1
+                                                                 avg =     2.3
+                                                                 max =      18
+                                                    Wald chi2(4)     = 1616.27
+Log likelihood = -1861.2354                         Prob > chi2      =  0.0000
+
+-------------------------------------------------------------------------------
+years_wospu~b | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |  -.0021591   .0983786    -0.02   0.982    -.1949777    .1906594
+author_g~_tnb |  -.5978553   .4329817    -1.38   0.167    -1.446484    .2507731
+      pubyear |  -.5525754   .0140867   -39.23   0.000    -.5801849   -.5249659
+years_wospu~d |   .0074031    .004657     1.59   0.112    -.0017244    .0165307
+        _cons |   1115.742   28.44717    39.22   0.000     1059.987    1171.498
+-------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+responseid_n: Identity       |
+                  var(_cons) |   .3861385   .0607716      .2836472    .5256634
+-----------------------------+------------------------------------------------
+               var(Residual) |   1.128606   .0572332      1.021825    1.246545
+------------------------------------------------------------------------------
+LR test vs. linear model: chibar2(01) = 98.60         Prob >= chibar2 = 0.0000
+
+. estimates store model2
+
+. 
+. * add author-level controls
+. mixed years_wospub_osfpub author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         || responseid_n: 
+
+Performing EM optimization ...
+
+Performing gradient-based optimization: 
+Iteration 0:  Log likelihood = -1833.3113  
+Iteration 1:  Log likelihood =  -1833.229  
+Iteration 2:  Log likelihood =  -1833.229  
+
+Computing standard errors ...
+
+Mixed-effects ML regression                         Number of obs    =   1,155
+Group variable: responseid_n                        Number of groups =     505
+                                                    Obs per group:
+                                                                 min =       1
+                                                                 avg =     2.3
+                                                                 max =      18
+                                                    Wald chi2(11)    = 1636.49
+Log likelihood =  -1833.229                         Prob > chi2      =  0.0000
+
+-------------------------------------------------------------------------------
+years_wospu~b | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |  -.0220316   .0985226    -0.22   0.823    -.2151323    .1710692
+author_g~_tnb |  -.5701681   .4298587    -1.33   0.185    -1.412676    .2723394
+      pubyear |  -.5564231   .0141635   -39.29   0.000     -.584183   -.5286631
+years_wospu~d |   .0080122   .0046837     1.71   0.087    -.0011677     .017192
+   race_black |  -.3703724   .4662801    -0.79   0.427    -1.284265    .5435198
+race_other_~n |  -.0840942   .2881712    -0.29   0.770    -.6488994    .4807111
+ race_chinese |   .1468389   .3301396     0.44   0.656    -.5002227    .7939006
+  race_indian |   .6252968   .3888533     1.61   0.108    -.1368417    1.387435
+    race_mena |  -.4109228    .359091    -1.14   0.252    -1.114728    .2928826
+  race_latine |   .1391994   .1796608     0.77   0.438    -.2129292     .491328
+race_other_~w |   .4877294   .2261367     2.16   0.031     .0445096    .9309493
+        _cons |   1123.483   28.59951    39.28   0.000     1067.429    1179.537
+-------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+responseid_n: Identity       |
+                  var(_cons) |   .3640866   .0593202      .2645571    .5010603
+-----------------------------+------------------------------------------------
+               var(Residual) |   1.131373    .057562      1.023996    1.250009
+------------------------------------------------------------------------------
+LR test vs. linear model: chibar2(01) = 90.95         Prob >= chibar2 = 0.0000
+
+. estimates store model3
+
+. 
+. * add paper published in feminist journal 
+. mixed years_wospub_osfpub author_gender_woman author_gender_tnb ///
+>         $paper_level_controls ///
+>         $author_level_controls ///
+>         feminist_journal ///
+>         || responseid_n: 
+
+Performing EM optimization ...
+
+Performing gradient-based optimization: 
+Iteration 0:  Log likelihood = -1833.2843  
+Iteration 1:  Log likelihood = -1833.2025  
+Iteration 2:  Log likelihood = -1833.2024  
+
+Computing standard errors ...
+
+Mixed-effects ML regression                         Number of obs    =   1,155
+Group variable: responseid_n                        Number of groups =     505
+                                                    Obs per group:
+                                                                 min =       1
+                                                                 avg =     2.3
+                                                                 max =      18
+                                                    Wald chi2(12)    = 1636.62
+Log likelihood = -1833.2024                         Prob > chi2      =  0.0000
+
+-------------------------------------------------------------------------------
+years_wospu~b | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+author_g~oman |  -.0213951   .0985678    -0.22   0.828    -.2145844    .1717942
+author_g~_tnb |  -.5711573   .4298915    -1.33   0.184    -1.413729    .2714146
+      pubyear |    -.55635   .0141673   -39.27   0.000    -.5841173   -.5285827
+years_wospu~d |   .0079843   .0046854     1.70   0.088    -.0011989    .0171676
+   race_black |  -.3712863   .4662992    -0.80   0.426    -1.285216    .5426434
+race_other_~n |  -.0852648   .2882304    -0.30   0.767    -.6501859    .4796563
+ race_chinese |   .1528984   .3312184     0.46   0.644    -.4962778    .8020746
+  race_indian |    .629067   .3892154     1.62   0.106    -.1337812    1.391915
+    race_mena |  -.4119716   .3591478    -1.15   0.251    -1.115888    .2919452
+  race_latine |   .1381067   .1797342     0.77   0.442    -.2141658    .4903792
+race_other_~w |   .4866072   .2262001     2.15   0.031     .0432633    .9299512
+feminist_jo~l |  -.0524933   .2278477    -0.23   0.818    -.4990666    .3940799
+        _cons |   1123.337   28.60697    39.27   0.000     1067.268    1179.406
+-------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+  Random-effects parameters  |   Estimate   Std. err.     [95% conf. interval]
+-----------------------------+------------------------------------------------
+responseid_n: Identity       |
+                  var(_cons) |   .3642644   .0593057      .2647483    .5011877
+-----------------------------+------------------------------------------------
+               var(Residual) |   1.131208   .0575469      1.023859    1.249813
+------------------------------------------------------------------------------
+LR test vs. linear model: chibar2(01) = 90.96         Prob >= chibar2 = 0.0000
+
+. estimates store model4
+
+. 
+. etable, estimates(model1 model2 model3 model4) ///
+>         mstat(N) mstat(r2) column(index) ///
+>         showstars showstarsnote stars(.05 "*" .01 "**" .001 "***", attach(_r_b
+> )) ///
+>         title("Mixed-Effects Linear Regression Models" ///
+>                 "predicting time from OSF to WoS publication (neg. coef --> sh
+> orter)") ///
+>         export($results/osf10_time_osf_to_wos.docx, as(docx) replace)
+
+Mixed-Effects Linear Regression Models predicting time from OSF to WoS publication (neg. coef --> shorter)
+-----------------------------------------------------------------------------------------------------------------------------------
+                                                                                      1            2            3            4     
+-----------------------------------------------------------------------------------------------------------------------------------
+Author woman                                                                       0.137       -0.002       -0.022       -0.021    
+                                                                                 (0.137)      (0.098)      (0.099)      (0.099)    
+Author trans/nonbinary                                                             0.089       -0.598       -0.570       -0.571    
+                                                                                 (0.575)      (0.433)      (0.430)      (0.430)    
+pubyear                                                                                        -0.553 ***   -0.556 ***   -0.556 ***
+                                                                                              (0.014)      (0.014)      (0.014)    
+Years after PhD published in WoS                                                                0.007        0.008        0.008    
+                                                                                              (0.005)      (0.005)      (0.005)    
+Black or African American                                                                                   -0.370       -0.371    
+                                                                                                           (0.466)      (0.466)    
+Other Asian                                                                                                 -0.084       -0.085    
+                                                                                                           (0.288)      (0.288)    
+Chinese                                                                                                      0.147        0.153    
+                                                                                                           (0.330)      (0.331)    
+Indian                                                                                                       0.625        0.629    
+                                                                                                           (0.389)      (0.389)    
+Middle Eastern or North African                                                                             -0.411       -0.412    
+                                                                                                           (0.359)      (0.359)    
+Hispanic, Spanish, or Latina/o/x                                                                             0.139        0.138    
+                                                                                                           (0.180)      (0.180)    
+Other Race / American Indian / Alaska Native or Native Hawiian / Pacific Islande                             0.488 *      0.487 *  
+                                                                                                           (0.226)      (0.226)    
+Paper submitted to feminist journal                                                                                      -0.052    
+                                                                                                                        (0.228)    
+Intercept                                                                         -0.592 *** 1115.742 *** 1123.483 *** 1123.337 ***
+                                                                                 (0.076)     (28.447)     (28.600)     (28.607)    
+var(_cons)                                                                         0.758        0.386        0.364        0.364    
+                                                                                 (0.115)      (0.061)      (0.059)      (0.059)    
+var(e)                                                                             2.617        1.129        1.131        1.131    
+                                                                                 (0.124)      (0.057)      (0.058)      (0.058)    
+Number of observations                                                              1278         1170         1155         1155    
+-----------------------------------------------------------------------------------------------------------------------------------
+*** p<.001, ** p<.01, * p<.05
+(collection ETable exported to file
+ ~/Documents/SocResearch/SocArXiv_gender/results/osf10_time_osf_to_wos.docx)
+
+.         
+.         
+. ***--------------------------***
+. log close osf10
+      name:  osf10
+       log:  /Users/mmking/Documents/SocResearch/SocArXiv_gender/stata/osf10_pap
+> er_outcomes.smcl
+  log type:  text
+ closed on:   3 Mar 2025, 13:28:52
+--------------------------------------------------------------------------------
